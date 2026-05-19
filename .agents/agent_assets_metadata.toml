@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "6c6LkS3Lb-tB0z4FEv33-"
+uri = "file://artifacts/tradequote/assets/images/icon.png"
+type = "image"
+title = "tradequote app icon"

@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "TradeQuote"
+version = "1.0.0"
+id = "artifacts/tradequote"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 24737
+
+[services.development]
+run = "pnpm --filter @workspace/tradequote run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/tradequote", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/tradequote", "run", "serve" ]
+
+[services.env]
+PORT = "24737"
+BASE_PATH = "/"
