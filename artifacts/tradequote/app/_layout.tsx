@@ -14,29 +14,32 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CustomersProvider } from "@/context/CustomersContext";
+import { ExpensesProvider } from "@/context/ExpensesContext";
+import { InvoicesProvider } from "@/context/InvoicesContext";
+import { JobsProvider } from "@/context/JobsContext";
 import { QuotesProvider } from "@/context/QuotesContext";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+const MODAL: any = { presentation: "modal", headerShown: false };
+const PUSH: any = { headerShown: false };
+
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="new-quote"
-        options={{
-          presentation: "modal",
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="quote/[id]"
-        options={{
-          headerShown: false,
-        }}
-      />
+      <Stack.Screen name="(tabs)" options={PUSH} />
+      <Stack.Screen name="new-quote" options={MODAL} />
+      <Stack.Screen name="new-customer" options={MODAL} />
+      <Stack.Screen name="new-invoice" options={MODAL} />
+      <Stack.Screen name="new-expense" options={MODAL} />
+      <Stack.Screen name="new-job" options={MODAL} />
+      <Stack.Screen name="quote/[id]" options={PUSH} />
+      <Stack.Screen name="customer/[id]" options={PUSH} />
+      <Stack.Screen name="invoice/[id]" options={PUSH} />
+      <Stack.Screen name="job/[id]" options={PUSH} />
     </Stack>
   );
 }
@@ -64,7 +67,15 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <QuotesProvider>
-                <RootLayoutNav />
+                <CustomersProvider>
+                  <InvoicesProvider>
+                    <ExpensesProvider>
+                      <JobsProvider>
+                        <RootLayoutNav />
+                      </JobsProvider>
+                    </ExpensesProvider>
+                  </InvoicesProvider>
+                </CustomersProvider>
               </QuotesProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

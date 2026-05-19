@@ -17,6 +17,7 @@ export interface Quote {
   jobTypeLabel: string;
   customerName: string;
   customerAddress: string;
+  customerId?: string;
   description: string;
   measurements: string;
   notes: string;
@@ -44,7 +45,6 @@ interface QuotesContextValue {
 }
 
 const QuotesContext = createContext<QuotesContextValue | null>(null);
-
 const STORAGE_KEY = "@tradequote_quotes";
 
 export function QuotesProvider({ children }: { children: React.ReactNode }) {
@@ -58,9 +58,7 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
   const loadQuotes = async () => {
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setQuotes(JSON.parse(stored));
-      }
+      if (stored) setQuotes(JSON.parse(stored));
     } catch (e) {
       console.error("Failed to load quotes", e);
     } finally {
@@ -73,33 +71,18 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addQuote = useCallback(async (quote: Quote) => {
-    setQuotes((prev) => {
-      const updated = [quote, ...prev];
-      saveQuotes(updated);
-      return updated;
-    });
+    setQuotes((prev) => { const updated = [quote, ...prev]; saveQuotes(updated); return updated; });
   }, []);
 
   const updateQuote = useCallback(async (id: string, updates: Partial<Quote>) => {
-    setQuotes((prev) => {
-      const updated = prev.map((q) => (q.id === id ? { ...q, ...updates } : q));
-      saveQuotes(updated);
-      return updated;
-    });
+    setQuotes((prev) => { const updated = prev.map((q) => q.id === id ? { ...q, ...updates } : q); saveQuotes(updated); return updated; });
   }, []);
 
   const deleteQuote = useCallback(async (id: string) => {
-    setQuotes((prev) => {
-      const updated = prev.filter((q) => q.id !== id);
-      saveQuotes(updated);
-      return updated;
-    });
+    setQuotes((prev) => { const updated = prev.filter((q) => q.id !== id); saveQuotes(updated); return updated; });
   }, []);
 
-  const getQuote = useCallback(
-    (id: string) => quotes.find((q) => q.id === id),
-    [quotes],
-  );
+  const getQuote = useCallback((id: string) => quotes.find((q) => q.id === id), [quotes]);
 
   return (
     <QuotesContext.Provider value={{ quotes, addQuote, updateQuote, deleteQuote, getQuote, loading }}>

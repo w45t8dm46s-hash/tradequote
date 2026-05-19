@@ -2,16 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import {
-  Alert,
-  Platform,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type QuoteStatus, useQuotes } from "@/context/QuotesContext";
@@ -51,24 +42,18 @@ export default function QuoteDetailScreen() {
     const lineItemsText = quote.lineItems
       .map((item) => `• ${item.description}: ${item.quantity} ${item.unit} × £${item.rate.toFixed(2)} = £${item.total.toFixed(2)}`)
       .join("\n");
-
     const text = `QUOTE ${quote.quoteNumber}\n\nPrepared for: ${quote.customerName}\n${quote.customerAddress ? `Address: ${quote.customerAddress}\n` : ""}\n${quote.customerSummary}\n\nLINE ITEMS:\n${lineItemsText}\n\nSubtotal: £${quote.subtotal.toFixed(2)}\nVAT (${quote.taxRate}%): £${quote.taxAmount.toFixed(2)}\nTOTAL: £${quote.total.toFixed(2)}\n\nValid for ${quote.validDays} days.`;
-
     await Share.share({ message: text, title: `Quote for ${quote.customerName}` });
   };
 
   const handleDelete = () => {
     Alert.alert("Delete Quote", "Are you sure you want to delete this quote?", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          await deleteQuote(quote.id);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          router.back();
-        },
-      },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        await deleteQuote(quote.id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        router.back();
+      }},
     ]);
   };
 
@@ -79,34 +64,23 @@ export default function QuoteDetailScreen() {
   };
 
   const date = new Date(quote.createdAt).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+    day: "numeric", month: "long", year: "numeric",
   });
 
   const bottomPad = isWeb ? 34 : insets.bottom + 16;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Feather name="arrow-left" size={20} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.topActions}>
-            <TouchableOpacity
-              style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={handleShare}
-            >
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleShare}>
               <Feather name="share-2" size={18} color={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.iconBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}
-              onPress={handleDelete}
-            >
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={handleDelete}>
               <Feather name="trash-2" size={18} color="#EF4444" />
             </TouchableOpacity>
           </View>
@@ -114,17 +88,10 @@ export default function QuoteDetailScreen() {
 
         <View style={styles.heroSection}>
           <View style={styles.quoteMetaRow}>
-            <Text style={[styles.quoteNumberText, { color: colors.mutedForeground }]}>
-              {quote.quoteNumber}
-            </Text>
-            <TouchableOpacity
-              style={[styles.statusBadge, { backgroundColor: currentStatus.color + "18" }]}
-              onPress={() => setShowStatusPicker(!showStatusPicker)}
-            >
+            <Text style={[styles.quoteNumberText, { color: colors.mutedForeground }]}>{quote.quoteNumber}</Text>
+            <TouchableOpacity style={[styles.statusBadge, { backgroundColor: currentStatus.color + "18" }]} onPress={() => setShowStatusPicker(!showStatusPicker)}>
               <Feather name={currentStatus.icon as any} size={12} color={currentStatus.color} />
-              <Text style={[styles.statusBadgeText, { color: currentStatus.color }]}>
-                {currentStatus.label}
-              </Text>
+              <Text style={[styles.statusBadgeText, { color: currentStatus.color }]}>{currentStatus.label}</Text>
               <Feather name="chevron-down" size={12} color={currentStatus.color} />
             </TouchableOpacity>
           </View>
@@ -132,25 +99,17 @@ export default function QuoteDetailScreen() {
           {showStatusPicker && (
             <View style={[styles.statusPicker, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {STATUS_OPTIONS.map((s) => (
-                <TouchableOpacity
-                  key={s.value}
-                  style={[styles.statusOption, { borderBottomColor: colors.border }]}
-                  onPress={() => changeStatus(s.value)}
-                >
+                <TouchableOpacity key={s.value} style={[styles.statusOption, { borderBottomColor: colors.border }]} onPress={() => changeStatus(s.value)}>
                   <Feather name={s.icon as any} size={16} color={s.color} />
                   <Text style={[styles.statusOptionText, { color: colors.text }]}>{s.label}</Text>
-                  {quote.status === s.value && (
-                    <Feather name="check" size={16} color={colors.primary} style={{ marginLeft: "auto" }} />
-                  )}
+                  {quote.status === s.value && <Feather name="check" size={16} color={colors.primary} style={{ marginLeft: "auto" }} />}
                 </TouchableOpacity>
               ))}
             </View>
           )}
 
           <Text style={[styles.customerNameLarge, { color: colors.text }]}>{quote.customerName}</Text>
-          {quote.customerAddress ? (
-            <Text style={[styles.addressText, { color: colors.mutedForeground }]}>{quote.customerAddress}</Text>
-          ) : null}
+          {quote.customerAddress ? <Text style={[styles.addressText, { color: colors.mutedForeground }]}>{quote.customerAddress}</Text> : null}
           <Text style={[styles.dateText, { color: colors.mutedForeground }]}>{date} · {quote.jobTypeLabel}</Text>
         </View>
 
@@ -162,18 +121,10 @@ export default function QuoteDetailScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>LINE ITEMS</Text>
           {quote.lineItems.map((item, i) => (
-            <View
-              key={i}
-              style={[
-                styles.lineItem,
-                i < quote.lineItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-              ]}
-            >
+            <View key={i} style={[styles.lineItem, i < quote.lineItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
               <View style={styles.lineItemLeft}>
                 <Text style={[styles.lineItemDesc, { color: colors.text }]}>{item.description}</Text>
-                <Text style={[styles.lineItemMeta, { color: colors.mutedForeground }]}>
-                  {item.quantity} {item.unit} × £{item.rate.toFixed(2)}
-                </Text>
+                <Text style={[styles.lineItemMeta, { color: colors.mutedForeground }]}>{item.quantity} {item.unit} × £{item.rate.toFixed(2)}</Text>
               </View>
               <Text style={[styles.lineItemTotal, { color: colors.text }]}>£{item.total.toFixed(2)}</Text>
             </View>
@@ -193,16 +144,29 @@ export default function QuoteDetailScreen() {
             <Text style={[styles.grandLabel, { color: colors.text }]}>Total</Text>
             <Text style={[styles.grandValue, { color: colors.primary }]}>£{quote.total.toFixed(2)}</Text>
           </View>
-          <Text style={[styles.validNote, { color: colors.mutedForeground }]}>
-            Valid for {quote.validDays} days from {date}
-          </Text>
+          <Text style={[styles.validNote, { color: colors.mutedForeground }]}>Valid for {quote.validDays} days from {date}</Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.shareFullBtn, { backgroundColor: colors.primary }]}
-          onPress={handleShare}
-          activeOpacity={0.85}
-        >
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
+            onPress={() => router.push({ pathname: "/new-invoice", params: { quoteId: quote.id } })}
+            activeOpacity={0.8}
+          >
+            <Feather name="file-plus" size={16} color={colors.text} />
+            <Text style={[styles.actionBtnText, { color: colors.text }]}>Create Invoice</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
+            onPress={() => router.push({ pathname: "/new-job", params: { quoteId: quote.id } })}
+            activeOpacity={0.8}
+          >
+            <Feather name="calendar" size={16} color={colors.text} />
+            <Text style={[styles.actionBtnText, { color: colors.text }]}>Schedule Job</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={[styles.shareFullBtn, { backgroundColor: colors.primary }]} onPress={handleShare} activeOpacity={0.85}>
           <Feather name="share-2" size={18} color="#fff" />
           <Text style={styles.shareFullBtnText}>Share Quote</Text>
         </TouchableOpacity>
@@ -224,29 +188,10 @@ const styles = StyleSheet.create({
   heroSection: { gap: 6, marginBottom: 8 },
   quoteMetaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   quoteNumberText: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
+  statusBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   statusBadgeText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  statusPicker: {
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: "hidden",
-    marginTop: 4,
-  },
-  statusOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
+  statusPicker: { borderRadius: 12, borderWidth: 1, overflow: "hidden", marginTop: 4 },
+  statusOption: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   statusOptionText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   customerNameLarge: { fontSize: 26, fontFamily: "Inter_700Bold", marginTop: 4 },
   addressText: { fontSize: 14, fontFamily: "Inter_400Regular" },
@@ -266,14 +211,9 @@ const styles = StyleSheet.create({
   grandLabel: { fontSize: 16, fontFamily: "Inter_700Bold" },
   grandValue: { fontSize: 20, fontFamily: "Inter_700Bold" },
   validNote: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
-  shareFullBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 14,
-    gap: 8,
-    marginTop: 4,
-  },
+  actionRow: { flexDirection: "row", gap: 10 },
+  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 13, borderRadius: 12, gap: 6 },
+  actionBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  shareFullBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, borderRadius: 14, gap: 8, marginTop: 4 },
   shareFullBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
