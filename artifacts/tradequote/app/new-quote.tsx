@@ -186,18 +186,28 @@ export default function NewQuoteScreen() {
 
   const saveQuote = async () => {
     if (!generatedQuote) return;
-    await addQuote(generatedQuote);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    try {
+      await addQuote(generatedQuote);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setError(e?.message ?? "Failed to save quote.");
+    }
   };
 
   const updateStatus = async (status: Quote["status"]) => {
     if (!generatedQuote) return;
     const updated = { ...generatedQuote, status };
     setGeneratedQuote(updated);
-    await addQuote(updated);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.back();
+    try {
+      await addQuote(updated);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.back();
+    } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setError(e?.message ?? "Failed to save quote.");
+    }
   };
 
   const bottomPad = isWeb ? 34 : insets.bottom + 16;
@@ -398,6 +408,12 @@ export default function NewQuoteScreen() {
 
       {step === "preview" && generatedQuote && (
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
+          {error ? (
+            <View style={[styles.errorBox, { backgroundColor: colors.destructive + "20", borderColor: colors.destructive }]}>
+              <Feather name="alert-circle" size={16} color={colors.destructive} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
           <View style={styles.previewHeader}>
             <View style={[styles.previewBadge, { backgroundColor: colors.secondary }]}>
               <Feather name="check-circle" size={14} color={colors.primary} />
