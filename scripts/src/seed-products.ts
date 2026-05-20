@@ -1,7 +1,7 @@
 import { getUncachableStripeClient } from "./stripeClient";
 
 const PRODUCT_NAME = "QuoteFlow Pro";
-const PRICE_PENCE = 1750; // £17.50
+const PRICE_PENCE = 1499; // £14.99
 const CURRENCY = "gbp";
 
 async function main() {
@@ -42,6 +42,16 @@ async function main() {
     recurring: { interval: "month" },
   });
   console.log(`Created price: ${price.id}`);
+
+  // Archive any other active monthly GBP prices on this product so the
+  // server-side allowlist resolves to a single current price.
+  for (const old of prices.data) {
+    if (old.id === price.id) continue;
+    if (old.currency !== CURRENCY) continue;
+    if (old.recurring?.interval !== "month") continue;
+    await stripe.prices.update(old.id, { active: false });
+    console.log(`Archived old price: ${old.id} (${old.unit_amount})`);
+  }
   console.log("Webhooks will sync this to the local database.");
 }
 
