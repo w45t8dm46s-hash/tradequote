@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
+import { useAuth } from "@clerk/expo";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -52,6 +53,7 @@ export default function NewQuoteScreen() {
   const insets = useSafeAreaInsets();
   const { addQuote } = useQuotes();
   const { customers } = useCustomers();
+  const { getToken } = useAuth();
   const params = useLocalSearchParams<{ customerId?: string; customerName?: string; customerAddress?: string }>();
   const isWeb = Platform.OS === "web";
 
@@ -113,9 +115,13 @@ export default function NewQuoteScreen() {
         .filter((p) => p.base64)
         .map((p) => p.base64 as string);
 
+      const token = await getToken();
       const response = await fetch(`${baseUrl}/api/quotes/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           jobType: selectedType?.label ?? jobType,
           customerName,
@@ -127,6 +133,11 @@ export default function NewQuoteScreen() {
         }),
       });
 
+      if (response.status === 402) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        router.replace("/upgrade");
+        return;
+      }
       if (!response.ok) throw new Error("Failed to generate quote");
       const data = await response.json();
 

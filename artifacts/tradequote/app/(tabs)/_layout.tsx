@@ -1,15 +1,19 @@
 import { BlurView } from "expo-blur";
-import { Tabs } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { SymbolView } from "expo-symbols";
+import { useAuth } from "@clerk/expo";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 
 export default function TabLayout() {
+  const { isSignedIn, isLoaded } = useAuth();
   const colors = useColors();
   const colorScheme = useColorScheme();
+  if (!isLoaded) return null;
+  if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";

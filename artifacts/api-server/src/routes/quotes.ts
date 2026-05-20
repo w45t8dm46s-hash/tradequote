@@ -1,9 +1,26 @@
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { Router } from "express";
+import { db, users } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { requireAuth, hasActiveSubscription, FREE_QUOTE_LIMIT, type AuthedRequest } from "../lib/requireAuth";
 
 const router = Router();
 
-router.post("/quotes/generate", async (req, res) => {
+router.post("/quotes/generate", requireAuth, async (req, res) => {
+  const userId = (req as AuthedRequest).userId;
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const isPro = await hasActiveSubscription(user.stripeCustomerId);
+  if (!isPro && user.quoteCount >= FREE_QUOTE_LIMIT) {
+    return res.status(402).json({
+      error: "upgrade_required",
+      message: `Free plan includes ${FREE_QUOTE_LIMIT} quotes. Upgrade to Pro for unlimited quotes.`,
+      quoteCount: user.quoteCount,
+      quoteLimit: FREE_QUOTE_LIMIT,
+    });
+  }
+
   const { jobType, customerName, customerAddress, description, measurements, notes, photos } = req.body;
 
   const textPrompt = `You are an expert quoting assistant for UK electricians. Generate a detailed, professional quote based on the following electrical job information. All work must be compliant with BS 7671 (18th Edition Wiring Regulations) and Part P of the UK Building Regulations.
@@ -48,7 +65,6 @@ Guidelines:
 
   try {
     const hasPhotos = photos && Array.isArray(photos) && photos.length > 0;
-
     const messageContent: any[] = hasPhotos
       ? [
           ...photos.map((b64: string) => ({
@@ -67,62 +83,22 @@ Guidelines:
 
     const block = message.content[0];
     if (block.type !== "text") {
-      res.status(500).json({ error: "Unexpected response from AI" });
-      return;
+      return res.status(500).json({ error: "Unexpected response from AI" });
     }
 
     const jsonText = block.text.trim().replace(/^```json\n?/, "").replace(/\n?```$/, "");
     const data = JSON.parse(jsonText);
+
+    // Increment quote count on success
+    await db
+      .update(users)
+      .set({ quoteCount: user.quoteCount + 1 })
+      .where(eq(users.id, userId));
+
     res.json(data);
   } catch (err) {
     console.error("Quote generation error:", err);
     res.status(500).json({ error: "Failed to generate quote" });
-  }
-});
-
-router.post("/follow-up", async (req, res) => {
-  const { customerName, jobType, status, scheduledDate, notes } = req.body;
-
-  const dateStr = scheduledDate
-    ? new Date(scheduledDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })
-    : null;
-
-  const contextMap: Record<string, string> = {
-    scheduled: `The job is scheduled for ${dateStr ?? "an upcoming date"}. Write a friendly confirmation/reminder message.`,
-    "in-progress": `The job is currently in progress. Write a professional update message to the customer.`,
-    completed: `The job has been completed. Write a thank-you message and ask for a review.`,
-    cancelled: `The job was cancelled. Write a polite message checking if they'd like to reschedule.`,
-  };
-
-  const prompt = `You are a professional UK electrician writing a short follow-up message to a customer.
-
-Customer Name: ${customerName}
-Job Type: ${jobType}
-Job Status: ${status}
-${dateStr ? `Scheduled Date: ${dateStr}` : ""}
-${notes ? `Notes: ${notes}` : ""}
-
-Context: ${contextMap[status] ?? "Write a professional follow-up message."}
-
-Write a short, friendly, professional text message (3-5 sentences) that sounds natural from an electrician. Use British English. Address the customer by first name. Do NOT include a subject line. Do NOT use formal letter formatting. Just write the message body.`;
-
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const block = message.content[0];
-    if (block.type !== "text") {
-      res.status(500).json({ error: "Unexpected response" });
-      return;
-    }
-
-    res.json({ message: block.text.trim() });
-  } catch (err) {
-    console.error("Follow-up generation error:", err);
-    res.status(500).json({ error: "Failed to generate follow-up message" });
   }
 });
 

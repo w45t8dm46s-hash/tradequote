@@ -6,6 +6,8 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ClerkProvider, ClerkLoaded } from "@clerk/expo";
+import { tokenCache } from "@clerk/expo/token-cache";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
@@ -27,15 +29,20 @@ const queryClient = new QueryClient();
 const MODAL: any = { presentation: "modal", headerShown: false };
 const PUSH: any = { headerShown: false };
 
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
+
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
+      <Stack.Screen name="(auth)" options={PUSH} />
       <Stack.Screen name="(tabs)" options={PUSH} />
       <Stack.Screen name="new-quote" options={MODAL} />
       <Stack.Screen name="new-customer" options={MODAL} />
       <Stack.Screen name="new-invoice" options={MODAL} />
       <Stack.Screen name="new-expense" options={MODAL} />
       <Stack.Screen name="new-job" options={MODAL} />
+      <Stack.Screen name="upgrade" options={MODAL} />
       <Stack.Screen name="quote/[id]" options={PUSH} />
       <Stack.Screen name="customer/[id]" options={PUSH} />
       <Stack.Screen name="invoice/[id]" options={PUSH} />
@@ -60,27 +67,41 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
+  if (!publishableKey) {
+    throw new Error(
+      "Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Restart the dev server after Clerk is configured.",
+    );
+  }
+
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView>
-            <KeyboardProvider>
-              <QuotesProvider>
-                <CustomersProvider>
-                  <InvoicesProvider>
-                    <ExpensesProvider>
-                      <JobsProvider>
-                        <RootLayoutNav />
-                      </JobsProvider>
-                    </ExpensesProvider>
-                  </InvoicesProvider>
-                </CustomersProvider>
-              </QuotesProvider>
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-        </QueryClientProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <ClerkProvider
+      publishableKey={publishableKey}
+      tokenCache={tokenCache}
+      proxyUrl={proxyUrl}
+    >
+      <ClerkLoaded>
+        <SafeAreaProvider>
+          <ErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <KeyboardProvider>
+                  <QuotesProvider>
+                    <CustomersProvider>
+                      <InvoicesProvider>
+                        <ExpensesProvider>
+                          <JobsProvider>
+                            <RootLayoutNav />
+                          </JobsProvider>
+                        </ExpensesProvider>
+                      </InvoicesProvider>
+                    </CustomersProvider>
+                  </QuotesProvider>
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </QueryClientProvider>
+          </ErrorBoundary>
+        </SafeAreaProvider>
+      </ClerkLoaded>
+    </ClerkProvider>
   );
 }
