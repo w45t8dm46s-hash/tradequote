@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { Alert, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Modal, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type QuoteStatus, useQuotes } from "@/context/QuotesContext";
@@ -24,6 +24,7 @@ export default function QuoteDetailScreen() {
 
   const quote = getQuote(id);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!quote) {
     return (
@@ -46,22 +47,13 @@ export default function QuoteDetailScreen() {
     await Share.share({ message: text, title: `Quote for ${quote.customerName}` });
   };
 
-  const handleDelete = () => {
-    const performDelete = async () => {
-      await deleteQuote(quote.id);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      router.back();
-    };
-    if (Platform.OS === "web") {
-      if (typeof window !== "undefined" && window.confirm("Delete this quote? This cannot be undone.")) {
-        performDelete();
-      }
-      return;
-    }
-    Alert.alert("Delete Quote", "Are you sure you want to delete this quote?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: performDelete },
-    ]);
+  const handleDelete = () => setShowDeleteConfirm(true);
+
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false);
+    await deleteQuote(quote.id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    router.back();
   };
 
   const changeStatus = async (status: QuoteStatus) => {
@@ -178,11 +170,35 @@ export default function QuoteDetailScreen() {
           <Text style={styles.shareFullBtnText}>Share Quote</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={showDeleteConfirm} transparent animationType="fade" onRequestClose={() => setShowDeleteConfirm(false)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowDeleteConfirm(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Delete Quote</Text>
+            <Text style={[styles.modalBody, { color: colors.mutedForeground }]}>This will permanently remove this quote. Are you sure?</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={[styles.modalBtn, { borderColor: colors.border }]} onPress={() => setShowDeleteConfirm(false)} activeOpacity={0.8}>
+                <Text style={[styles.modalBtnText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: "#EF4444", borderColor: "#EF4444" }]} onPress={confirmDelete} activeOpacity={0.85}>
+                <Text style={[styles.modalBtnText, { color: "#fff" }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 24 },
+  modalCard: { width: "100%", maxWidth: 360, padding: 20, borderRadius: 14, borderWidth: 1, gap: 12 },
+  modalTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
+  modalBody: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 8 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, alignItems: "center" },
+  modalBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   notFound: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
