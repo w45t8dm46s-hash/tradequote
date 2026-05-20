@@ -76,12 +76,12 @@ export default function NewQuoteScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsMultipleSelection: true,
-      quality: 0.7,
+      quality: 0.3,
       base64: true,
     });
     if (!result.canceled) {
       const assets = result.assets.map((a) => ({ uri: a.uri, base64: a.base64 }));
-      setPhotos((prev) => [...prev, ...assets].slice(0, 6));
+      setPhotos((prev) => [...prev, ...assets].slice(0, 3));
     }
   };
 
@@ -92,9 +92,9 @@ export default function NewQuoteScreen() {
       Alert.alert("Permission needed", "Camera permission is required to take photos.");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.3, base64: true });
     if (!result.canceled) {
-      setPhotos((prev) => [...prev, { uri: result.assets[0].uri, base64: result.assets[0].base64 }].slice(0, 6));
+      setPhotos((prev) => [...prev, { uri: result.assets[0].uri, base64: result.assets[0].base64 }].slice(0, 3));
     }
   };
 
@@ -138,7 +138,15 @@ export default function NewQuoteScreen() {
         router.replace("/upgrade");
         return;
       }
-      if (!response.ok) throw new Error("Failed to generate quote");
+      if (!response.ok) {
+        let serverMsg = `Server responded ${response.status}`;
+        try {
+          const errBody = await response.json();
+          if (errBody?.error) serverMsg = errBody.error;
+          if (errBody?.message) serverMsg = errBody.message;
+        } catch {}
+        throw new Error(serverMsg);
+      }
       const data = await response.json();
 
       const quote: Quote = {
@@ -168,10 +176,11 @@ export default function NewQuoteScreen() {
       setGeneratedQuote(quote);
       setStep("preview");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       setStep("details");
-      setError("Failed to generate quote. Please check your connection and try again.");
+      const msg = e?.message ? `Failed to generate quote: ${e.message}` : "Failed to generate quote. Please check your connection and try again.";
+      setError(msg);
     }
   };
 
@@ -330,7 +339,7 @@ export default function NewQuoteScreen() {
 
           <View style={styles.fieldGroup}>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>
-              Photos ({photos.length}/6){photos.length > 0 ? " — AI will analyse these" : ""}
+              Photos ({photos.length}/3){photos.length > 0 ? " — AI will analyse these" : ""}
             </Text>
             <View style={styles.photoRow}>
               {photos.map((p, i) => (
@@ -346,7 +355,7 @@ export default function NewQuoteScreen() {
                   )}
                 </View>
               ))}
-              {photos.length < 6 && (
+              {photos.length < 3 && (
                 <View style={styles.photoButtons}>
                   <TouchableOpacity style={[styles.photoAdd, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={takePhoto}>
                     <Feather name="camera" size={20} color={colors.primary} />
