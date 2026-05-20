@@ -12,15 +12,15 @@ import { useColors } from "@/hooks/useColors";
 function genId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
 
 const JOB_TYPES = [
-  { id: "plumbing", label: "Plumbing", icon: "droplet" },
-  { id: "electrical", label: "Electrical", icon: "zap" },
-  { id: "carpentry", label: "Carpentry", icon: "tool" },
-  { id: "painting", label: "Painting", icon: "edit-3" },
-  { id: "roofing", label: "Roofing", icon: "home" },
-  { id: "landscaping", label: "Landscaping", icon: "sun" },
-  { id: "hvac", label: "HVAC", icon: "wind" },
-  { id: "tiling", label: "Tiling", icon: "grid" },
-  { id: "general", label: "General", icon: "briefcase" },
+  { id: "rewire", label: "Rewire", icon: "zap" },
+  { id: "sockets-switches", label: "Sockets & Switches", icon: "square" },
+  { id: "lighting", label: "Lighting", icon: "sun" },
+  { id: "consumer-unit", label: "Consumer Unit", icon: "shield" },
+  { id: "ev-charger", label: "EV Charger", icon: "battery-charging" },
+  { id: "fault-finding", label: "Fault Finding", icon: "search" },
+  { id: "eicr", label: "EICR / Testing", icon: "clipboard" },
+  { id: "smoke-alarms", label: "Smoke Alarms", icon: "bell" },
+  { id: "other", label: "Other Electrical", icon: "tool" },
 ];
 
 export default function NewJobScreen() {
@@ -34,7 +34,7 @@ export default function NewJobScreen() {
   const [customerName, setCustomerName] = useState("");
   const [customerId, setCustomerId] = useState(params.customerId ?? "");
   const [address, setAddress] = useState("");
-  const [jobType, setJobType] = useState("general");
+  const [jobType, setJobType] = useState("rewire");
   const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split("T")[0]);
   const [scheduledTime, setScheduledTime] = useState("09:00");
   const [notes, setNotes] = useState("");

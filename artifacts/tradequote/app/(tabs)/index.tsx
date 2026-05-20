@@ -70,7 +70,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{greeting}</Text>
-            <Text style={[styles.appTitle, { color: colors.text }]}>TradeQuote</Text>
+            <Text style={[styles.appTitle, { color: colors.text }]}>QuoteFlow</Text>
           </View>
           <TouchableOpacity
             style={[styles.newBtn, { backgroundColor: colors.primary }]}

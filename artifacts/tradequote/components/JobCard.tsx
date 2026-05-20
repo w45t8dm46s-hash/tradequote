@@ -14,8 +14,15 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 const JOB_ICONS: Record<string, string> = {
-  plumbing: "droplet", electrical: "zap", carpentry: "tool", painting: "edit-3",
-  roofing: "home", landscaping: "sun", hvac: "wind", tiling: "grid", general: "briefcase",
+  rewire: "zap",
+  "sockets-switches": "square",
+  lighting: "sun",
+  "consumer-unit": "shield",
+  "ev-charger": "battery-charging",
+  "fault-finding": "search",
+  eicr: "clipboard",
+  "smoke-alarms": "bell",
+  other: "tool",
 };
 
 export function JobCard({ job }: { job: Job }) {

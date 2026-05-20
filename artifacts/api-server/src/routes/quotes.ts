@@ -6,7 +6,7 @@ const router = Router();
 router.post("/quotes/generate", async (req, res) => {
   const { jobType, customerName, customerAddress, description, measurements, notes, photos } = req.body;
 
-  const textPrompt = `You are an expert quoting assistant for UK tradespeople. Generate a detailed, professional quote based on the following job information.
+  const textPrompt = `You are an expert quoting assistant for UK electricians. Generate a detailed, professional quote based on the following electrical job information. All work must be compliant with BS 7671 (18th Edition Wiring Regulations) and Part P of the UK Building Regulations.
 
 Job Type: ${jobType}
 Customer Name: ${customerName}
@@ -14,15 +14,15 @@ ${customerAddress ? `Customer Address: ${customerAddress}` : ""}
 Job Description: ${description}
 ${measurements ? `Measurements/Quantities: ${measurements}` : ""}
 ${notes ? `Additional Notes: ${notes}` : ""}
-${photos?.length ? `\nNote: ${photos.length} photo(s) have been provided. Please analyse them carefully to identify the specific materials, condition, and scope of work visible in the images.` : ""}
+${photos?.length ? `\nNote: ${photos.length} photo(s) have been provided. Please analyse them carefully to identify existing electrical fittings, cable types, consumer unit condition, accessory makes/models, and any safety or scope-of-work concerns visible in the images.` : ""}
 
 Return ONLY a valid JSON object with this exact structure (no markdown, no explanation, just JSON):
 {
   "lineItems": [
     {
-      "description": "string (specific task or material)",
+      "description": "string (specific task or electrical material)",
       "quantity": number,
-      "unit": "string (e.g. hours, m², units, m, days)",
+      "unit": "string (e.g. hours, units, m, days)",
       "rate": number (price per unit in GBP, realistic UK market rates),
       "total": number (quantity × rate)
     }
@@ -31,18 +31,20 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no expla
   "taxRate": 20,
   "taxAmount": number (subtotal × 0.20),
   "total": number (subtotal + taxAmount),
-  "professionalSummary": "string (internal professional summary of the work, 2-3 sentences)",
+  "professionalSummary": "string (internal professional summary of the work including any regs/testing considerations, 2-3 sentences)",
   "customerSummary": "string (clear customer-facing description of what will be done, 2-4 sentences)",
   "validDays": 30
 }
 
 Guidelines:
-- Generate 3-8 line items that are specific and realistic for ${jobType} work in the UK
-- Use realistic UK market rates (materials + labour appropriately separated where needed)
-- If photos are provided, identify the specific materials visible (e.g. exact tile type, flooring brand/style, pipe material) and price accordingly
-- The customerSummary should be professional and reassuring
+- Generate 3-8 line items specific and realistic for UK electrical work
+- Use realistic UK electrician market rates (£45-£75/hr labour typical; materials at trade prices)
+- Include appropriate items such as: labour, cable (e.g. 2.5mm² T&E, 6mm² T&E, 6242Y), accessories (sockets, switches, back boxes), consumer unit components (RCBOs, MCBs), testing & certification (EIC or Minor Works), notification to building control where required (Part P)
+- If photos are provided, identify visible fittings (e.g. brand/style of socket, condition of consumer unit, cable type) and price accordingly
+- Include testing/certification as a separate line item where appropriate
+- The customerSummary should be professional, reassuring, and mention safety/compliance
 - All monetary values should be realistic for the UK market
-- Include both labour and materials as separate line items where appropriate`;
+- Separate labour and materials as distinct line items where appropriate`;
 
   try {
     const hasPhotos = photos && Array.isArray(photos) && photos.length > 0;
@@ -92,7 +94,7 @@ router.post("/follow-up", async (req, res) => {
     cancelled: `The job was cancelled. Write a polite message checking if they'd like to reschedule.`,
   };
 
-  const prompt = `You are a professional tradesperson writing a short follow-up message to a customer.
+  const prompt = `You are a professional UK electrician writing a short follow-up message to a customer.
 
 Customer Name: ${customerName}
 Job Type: ${jobType}
@@ -102,7 +104,7 @@ ${notes ? `Notes: ${notes}` : ""}
 
 Context: ${contextMap[status] ?? "Write a professional follow-up message."}
 
-Write a short, friendly, professional text message (3-5 sentences) that sounds natural from a tradesperson. Use British English. Address the customer by first name. Do NOT include a subject line. Do NOT use formal letter formatting. Just write the message body.`;
+Write a short, friendly, professional text message (3-5 sentences) that sounds natural from an electrician. Use British English. Address the customer by first name. Do NOT include a subject line. Do NOT use formal letter formatting. Just write the message body.`;
 
   try {
     const message = await anthropic.messages.create({

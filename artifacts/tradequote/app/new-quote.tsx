@@ -23,15 +23,15 @@ import { type Quote, useQuotes } from "@/context/QuotesContext";
 import { useColors } from "@/hooks/useColors";
 
 const JOB_TYPES = [
-  { id: "plumbing", label: "Plumbing", icon: "droplet" },
-  { id: "electrical", label: "Electrical", icon: "zap" },
-  { id: "carpentry", label: "Carpentry", icon: "tool" },
-  { id: "painting", label: "Painting", icon: "edit-3" },
-  { id: "roofing", label: "Roofing", icon: "home" },
-  { id: "landscaping", label: "Landscaping", icon: "sun" },
-  { id: "hvac", label: "HVAC", icon: "wind" },
-  { id: "tiling", label: "Tiling", icon: "grid" },
-  { id: "general", label: "General", icon: "briefcase" },
+  { id: "rewire", label: "Rewire", icon: "zap" },
+  { id: "sockets-switches", label: "Sockets & Switches", icon: "square" },
+  { id: "lighting", label: "Lighting", icon: "sun" },
+  { id: "consumer-unit", label: "Consumer Unit", icon: "shield" },
+  { id: "ev-charger", label: "EV Charger", icon: "battery-charging" },
+  { id: "fault-finding", label: "Fault Finding", icon: "search" },
+  { id: "eicr", label: "EICR / Testing", icon: "clipboard" },
+  { id: "smoke-alarms", label: "Smoke Alarms", icon: "bell" },
+  { id: "other", label: "Other Electrical", icon: "tool" },
 ];
 
 type Step = "type" | "details" | "generating" | "preview";
@@ -189,7 +189,7 @@ export default function NewQuoteScreen() {
       {step === "type" && (
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
           <Text style={[styles.stepTitle, { color: colors.text }]}>What type of job?</Text>
-          <Text style={[styles.stepSub, { color: colors.mutedForeground }]}>Select the trade that best fits this quote</Text>
+          <Text style={[styles.stepSub, { color: colors.mutedForeground }]}>Select the electrical work that best fits this quote</Text>
           <View style={styles.typeGrid}>
             {JOB_TYPES.map((t) => {
               const active = jobType === t.id;
@@ -297,7 +297,7 @@ export default function NewQuoteScreen() {
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Measurements / Quantities</Text>
             <TextInput
               style={[styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-              placeholder="e.g. 20sqm floor area, 3 rooms, 15m of pipe..."
+              placeholder="e.g. 8 double sockets, 12m cable run, 3 light fittings..."
               placeholderTextColor={colors.mutedForeground}
               value={measurements}
               onChangeText={setMeasurements}

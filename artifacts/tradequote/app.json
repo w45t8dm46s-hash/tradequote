@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "TradeQuote",
-    "slug": "tradequote",
+    "name": "QuoteFlow",
+    "slug": "quoteflow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tradequote",
+    "scheme": "quoteflow",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
