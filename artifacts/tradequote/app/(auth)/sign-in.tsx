@@ -75,6 +75,10 @@ export default function SignInScreen() {
           {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
         </Pressable>
 
+        <View style={[styles.linkRow, { marginTop: 16 }]}>
+          <Link href="/(auth)/forgot-password"><Text style={styles.link}>Forgot password?</Text></Link>
+        </View>
+
         <View style={styles.linkRow}>
           <Text style={styles.linkLabel}>New to QuoteFlow? </Text>
           <Link href="/(auth)/sign-up"><Text style={styles.link}>Create account</Text></Link>
