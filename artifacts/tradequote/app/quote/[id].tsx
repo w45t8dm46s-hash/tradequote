@@ -47,13 +47,20 @@ export default function QuoteDetailScreen() {
   };
 
   const handleDelete = () => {
+    const performDelete = async () => {
+      await deleteQuote(quote.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      router.back();
+    };
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm("Delete this quote? This cannot be undone.")) {
+        performDelete();
+      }
+      return;
+    }
     Alert.alert("Delete Quote", "Are you sure you want to delete this quote?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-        await deleteQuote(quote.id);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.back();
-      }},
+      { text: "Delete", style: "destructive", onPress: performDelete },
     ]);
   };
 

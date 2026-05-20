@@ -58,7 +58,19 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
   const loadQuotes = async () => {
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) setQuotes(JSON.parse(stored));
+      if (stored) {
+        const parsed: Quote[] = JSON.parse(stored);
+        const seen = new Set<string>();
+        const deduped = parsed.filter((q) => {
+          if (seen.has(q.id)) return false;
+          seen.add(q.id);
+          return true;
+        });
+        setQuotes(deduped);
+        if (deduped.length !== parsed.length) {
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(deduped)).catch(() => {});
+        }
+      }
     } catch (e) {
       console.error("Failed to load quotes", e);
     } finally {
@@ -115,7 +127,15 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addQuote = useCallback((quote: Quote) =>
-    enqueueMutation((cur) => [quote, ...cur]), [enqueueMutation]);
+    enqueueMutation((cur) => {
+      const idx = cur.findIndex((q) => q.id === quote.id);
+      if (idx >= 0) {
+        const next = [...cur];
+        next[idx] = quote;
+        return next;
+      }
+      return [quote, ...cur];
+    }), [enqueueMutation]);
 
   const updateQuote = useCallback((id: string, updates: Partial<Quote>) =>
     enqueueMutation((cur) => cur.map((q) => q.id === id ? { ...q, ...updates } : q)), [enqueueMutation]);
