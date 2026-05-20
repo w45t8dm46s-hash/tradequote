@@ -6,6 +6,8 @@ import { Modal, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity,
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type QuoteStatus, useQuotes } from "@/context/QuotesContext";
+import { useSettings } from "@/context/SettingsContext";
+import { printQuote } from "@/lib/quotePdf";
 import { useColors } from "@/hooks/useColors";
 
 const STATUS_OPTIONS: { value: QuoteStatus; label: string; icon: string; color: string }[] = [
@@ -18,6 +20,7 @@ const STATUS_OPTIONS: { value: QuoteStatus; label: string; icon: string; color: 
 export default function QuoteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getQuote, updateQuote, deleteQuote } = useQuotes();
+  const { settings } = useSettings();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
@@ -76,6 +79,15 @@ export default function QuoteDetailScreen() {
             <Feather name="arrow-left" size={20} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.topActions}>
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push({ pathname: "/quote/edit/[id]", params: { id: quote.id } })}
+            >
+              <Feather name="edit-2" size={18} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => printQuote(quote, settings)}>
+              <Feather name="printer" size={18} color={colors.text} />
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleShare}>
               <Feather name="share-2" size={18} color={colors.text} />
             </TouchableOpacity>
@@ -171,6 +183,17 @@ export default function QuoteDetailScreen() {
           >
             <Feather name="calendar" size={16} color={colors.text} />
             <Text style={[styles.actionBtnText, { color: colors.text }]}>Schedule Job</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]} onPress={() => router.push({ pathname: "/quote/edit/[id]", params: { id: quote.id } })} activeOpacity={0.85}>
+            <Feather name="edit-2" size={16} color={colors.text} />
+            <Text style={[styles.actionBtnText, { color: colors.text }]}>Edit Quote</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]} onPress={() => printQuote(quote, settings)} activeOpacity={0.85}>
+            <Feather name="download" size={16} color={colors.text} />
+            <Text style={[styles.actionBtnText, { color: colors.text }]}>Download PDF</Text>
           </TouchableOpacity>
         </View>
 

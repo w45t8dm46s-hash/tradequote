@@ -23,6 +23,7 @@ import { getApiBaseUrl } from "@/lib/api";
 
 import { useCustomers } from "@/context/CustomersContext";
 import { type Quote, useQuotes } from "@/context/QuotesContext";
+import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 
 const JOB_TYPES = [
@@ -55,6 +56,7 @@ export default function NewQuoteScreen() {
   const insets = useSafeAreaInsets();
   const { addQuote } = useQuotes();
   const { customers } = useCustomers();
+  const { settings } = useSettings();
   const { getToken } = useAuth();
   const params = useLocalSearchParams<{ customerId?: string; customerName?: string; customerAddress?: string }>();
   const isWeb = Platform.OS === "web";
@@ -131,6 +133,10 @@ export default function NewQuoteScreen() {
           measurements,
           notes,
           photos: photoBase64,
+          labourRate: settings.labourRate || undefined,
+          vatRate: settings.vatRegistered ? (settings.vatRate ?? 20) : 0,
+          vatRegistered: settings.vatRegistered,
+          validDays: settings.validDays || undefined,
         }),
       });
 

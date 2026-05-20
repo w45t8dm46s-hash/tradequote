@@ -21,6 +21,7 @@ import { ExpensesProvider } from "@/context/ExpensesContext";
 import { InvoicesProvider } from "@/context/InvoicesContext";
 import { JobsProvider } from "@/context/JobsContext";
 import { QuotesProvider } from "@/context/QuotesContext";
+import { SettingsProvider } from "@/context/SettingsContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,7 +44,10 @@ function RootLayoutNav() {
       <Stack.Screen name="new-expense" options={MODAL} />
       <Stack.Screen name="new-job" options={MODAL} />
       <Stack.Screen name="upgrade" options={MODAL} />
+      <Stack.Screen name="account" options={PUSH} />
+      <Stack.Screen name="settings" options={PUSH} />
       <Stack.Screen name="quote/[id]" options={PUSH} />
+      <Stack.Screen name="quote/edit/[id]" options={MODAL} />
       <Stack.Screen name="customer/[id]" options={PUSH} />
       <Stack.Screen name="invoice/[id]" options={PUSH} />
       <Stack.Screen name="job/[id]" options={PUSH} />
@@ -85,17 +89,19 @@ export default function RootLayout() {
             <QueryClientProvider client={queryClient}>
               <GestureHandlerRootView style={{ flex: 1 }}>
                 <KeyboardProvider>
-                  <QuotesProvider>
-                    <CustomersProvider>
-                      <InvoicesProvider>
-                        <ExpensesProvider>
-                          <JobsProvider>
-                            <RootLayoutNav />
-                          </JobsProvider>
-                        </ExpensesProvider>
-                      </InvoicesProvider>
-                    </CustomersProvider>
-                  </QuotesProvider>
+                  <SettingsProvider>
+                    <QuotesProvider>
+                      <CustomersProvider>
+                        <InvoicesProvider>
+                          <ExpensesProvider>
+                            <JobsProvider>
+                              <RootLayoutNav />
+                            </JobsProvider>
+                          </ExpensesProvider>
+                        </InvoicesProvider>
+                      </CustomersProvider>
+                    </QuotesProvider>
+                  </SettingsProvider>
                 </KeyboardProvider>
               </GestureHandlerRootView>
             </QueryClientProvider>
