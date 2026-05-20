@@ -2,7 +2,7 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq, sql, and } from "drizzle-orm";
-import { requireAuth, hasActiveSubscription, FREE_QUOTE_LIMIT, type AuthedRequest } from "../lib/requireAuth";
+import { requireAuth, hasActiveSubscription, hasEverSubscribed, FREE_QUOTE_LIMIT, type AuthedRequest } from "../lib/requireAuth";
 
 const router = Router();
 
@@ -24,6 +24,19 @@ router.post("/quotes/generate", requireAuth, async (req, res) => {
       .returning({ quoteCount: users.quoteCount });
     reservedCount = updated?.quoteCount ?? user.quoteCount + 1;
   } else {
+    // Block ex-subscribers from falling back to the free allowance.
+    // If they have ever had a Pro subscription (even a cancelled/expired one),
+    // they must re-subscribe — there is no free-tier loophole.
+    const wasEverPro = await hasEverSubscribed(user.stripeCustomerId);
+    if (wasEverPro) {
+      return res.status(402).json({
+        error: "upgrade_required",
+        message: "Your Pro subscription has ended. Resubscribe to continue generating quotes.",
+        quoteCount: user.quoteCount,
+        quoteLimit: FREE_QUOTE_LIMIT,
+      });
+    }
+
     const updated = await db
       .update(users)
       .set({ quoteCount: sql`${users.quoteCount} + 1` })

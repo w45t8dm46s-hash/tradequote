@@ -61,6 +61,26 @@ export async function hasActiveSubscription(stripeCustomerId: string | null): Pr
   return result.rows.length > 0;
 }
 
+/**
+ * Returns true if this customer has EVER had a Pro subscription (including
+ * cancelled/expired ones). Used to close the loophole where an ex-subscriber
+ * could fall back to the free-quote allowance after cancellation.
+ */
+export async function hasEverSubscribed(stripeCustomerId: string | null): Promise<boolean> {
+  if (!stripeCustomerId) return false;
+  const result = await db.execute(sql`
+    SELECT 1
+    FROM stripe.subscriptions s
+    JOIN stripe.subscription_items si ON si.subscription = s.id
+    JOIN stripe.prices pr ON pr.id = si.price
+    JOIN stripe.products p ON p.id = pr.product
+    WHERE s.customer = ${stripeCustomerId}
+      AND p.active = true
+    LIMIT 1
+  `);
+  return result.rows.length > 0;
+}
+
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const auth = getAuth(req);
@@ -79,3 +99,4 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 };
 
 export { FREE_QUOTE_LIMIT };
+export type { AuthedRequest };
