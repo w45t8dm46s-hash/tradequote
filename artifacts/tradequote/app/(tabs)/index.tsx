@@ -1,8 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useClerk } from "@clerk/expo";
 import React from "react";
-import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { QuoteCard } from "@/components/QuoteCard";
@@ -29,7 +28,6 @@ function StatCard({ label, value, icon, color }: { label: string; value: string;
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const clerk = useClerk();
   const { quotes } = useQuotes();
   const { invoices } = useInvoices();
   const { expenses } = useExpenses();
@@ -77,19 +75,10 @@ export default function HomeScreen() {
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity
               style={[styles.newBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
-              onPress={() => {
-                if (Platform.OS === "web") {
-                  if (confirm("Sign out of QuoteFlow?")) clerk.signOut();
-                } else {
-                  Alert.alert("Sign out", "Sign out of QuoteFlow?", [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Sign out", style: "destructive", onPress: () => clerk.signOut() },
-                  ]);
-                }
-              }}
+              onPress={() => router.push("/account")}
               activeOpacity={0.85}
             >
-              <Feather name="log-out" size={18} color={colors.mutedForeground} />
+              <Feather name="user" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.newBtn, { backgroundColor: colors.primary }]}

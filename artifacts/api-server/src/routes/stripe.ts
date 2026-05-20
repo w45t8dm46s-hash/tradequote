@@ -83,4 +83,72 @@ router.post("/stripe/checkout", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/stripe/cancel", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as AuthedRequest).userId;
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user.stripeCustomerId) return res.status(400).json({ error: "No subscription found" });
+
+    const result = await db.execute(sql`
+      SELECT s.id
+      FROM stripe.subscriptions s
+      JOIN stripe.subscription_items si ON si.subscription = s.id
+      JOIN stripe.prices pr ON pr.id = si.price
+      JOIN stripe.products p ON p.id = pr.product
+      WHERE s.customer = ${user.stripeCustomerId}
+        AND s.status IN ('active', 'trialing')
+      ORDER BY s.created DESC
+      LIMIT 1
+    `);
+    const row = result.rows[0] as { id: string } | undefined;
+    if (!row?.id) return res.status(400).json({ error: "No active subscription found" });
+
+    const stripe = await getUncachableStripeClient();
+    const sub = await stripe.subscriptions.update(row.id, { cancel_at_period_end: true });
+
+    res.json({
+      ok: true,
+      cancelAtPeriodEnd: sub.cancel_at_period_end,
+      currentPeriodEnd: sub.current_period_end,
+    });
+  } catch (err: any) {
+    console.error("Cancel error:", err);
+    res.status(500).json({ error: err.message || "Failed to cancel subscription" });
+  }
+});
+
+router.post("/stripe/resume", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as AuthedRequest).userId;
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user?.stripeCustomerId) return res.status(400).json({ error: "No subscription found" });
+
+    const result = await db.execute(sql`
+      SELECT s.id
+      FROM stripe.subscriptions s
+      JOIN stripe.subscription_items si ON si.subscription = s.id
+      JOIN stripe.prices pr ON pr.id = si.price
+      JOIN stripe.products p ON p.id = pr.product
+      WHERE s.customer = ${user.stripeCustomerId}
+        AND s.status IN ('active', 'trialing')
+        AND s.cancel_at_period_end = true
+        AND pr.active = true
+        AND p.active = true
+      ORDER BY s.created DESC
+      LIMIT 1
+    `);
+    const row = result.rows[0] as { id: string } | undefined;
+    if (!row?.id) return res.status(400).json({ error: "No cancellation to undo" });
+
+    const stripe = await getUncachableStripeClient();
+    const sub = await stripe.subscriptions.update(row.id, { cancel_at_period_end: false });
+
+    res.json({ ok: true, cancelAtPeriodEnd: sub.cancel_at_period_end });
+  } catch (err: any) {
+    console.error("Resume error:", err);
+    res.status(500).json({ error: err.message || "Failed to resume subscription" });
+  }
+});
+
 export default router;

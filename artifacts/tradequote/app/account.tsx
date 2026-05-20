@@ -1,0 +1,296 @@
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useAuth, useClerk, useUser } from "@clerk/expo";
+import { useRouter } from "expo-router";
+import { Feather } from "@expo/vector-icons";
+
+import { getApiBaseUrl } from "@/lib/api";
+
+type MeResponse = {
+  id: string;
+  email: string | null;
+  quoteCount: number;
+  quoteLimit: number;
+  isPro: boolean;
+  quotesRemaining: number | null;
+  subscription: {
+    status: string;
+    cancelAtPeriodEnd: boolean;
+    currentPeriodEnd: number | null;
+    priceAmount: number | null;
+    currency: string | null;
+    interval: string | null;
+  } | null;
+};
+
+function formatDate(unixSeconds: number | null): string {
+  if (!unixSeconds) return "—";
+  return new Date(unixSeconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function formatPrice(amount: number | null, currency: string | null, interval: string | null): string {
+  if (amount == null) return "";
+  const symbol = currency === "gbp" || currency === "GBP" ? "£" : currency === "usd" ? "$" : currency === "eur" ? "€" : "";
+  return `${symbol}${(amount / 100).toFixed(2)}/${interval ?? "month"}`;
+}
+
+export default function AccountScreen() {
+  const router = useRouter();
+  const { getToken } = useAuth();
+  const { user } = useUser();
+  const clerk = useClerk();
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const load = useCallback(async () => {
+    setError("");
+    try {
+      const token = await getToken();
+      const resp = await fetch(`${getApiBaseUrl()}/api/me`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = (await resp.json()) as MeResponse;
+      if (!resp.ok) throw new Error((data as any).error || "Failed to load account");
+      setMe(data);
+    } catch (e: any) {
+      setError(e.message || "Could not load account");
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCancel = async () => {
+    setShowConfirm(false);
+    setBusy(true);
+    setError("");
+    setInfo("");
+    try {
+      const token = await getToken();
+      const resp = await fetch(`${getApiBaseUrl()}/api/stripe/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Failed to cancel");
+      setInfo("Your subscription will end at the end of the current billing period. You'll keep Pro access until then.");
+      await load();
+    } catch (e: any) {
+      setError(e.message || "Cancel failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResume = async () => {
+    setBusy(true);
+    setError("");
+    setInfo("");
+    try {
+      const token = await getToken();
+      const resp = await fetch(`${getApiBaseUrl()}/api/stripe/resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Failed to resume");
+      setInfo("Your subscription has been resumed. Renewal will continue as normal.");
+      await load();
+    } catch (e: any) {
+      setError(e.message || "Resume failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const email = me?.email || user?.primaryEmailAddress?.emailAddress || "";
+  const sub = me?.subscription ?? null;
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#FAFAFA" }} contentContainerStyle={styles.container}>
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Feather name="arrow-left" size={22} color="#111" />
+        </Pressable>
+        <Text style={styles.topTitle}>My Account</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      {loading ? (
+        <View style={{ paddingVertical: 40 }}>
+          <ActivityIndicator color="#FF6B35" />
+        </View>
+      ) : (
+        <>
+          <View style={styles.card}>
+            <Text style={styles.label}>Signed in as</Text>
+            <Text style={styles.value}>{email || "—"}</Text>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Text style={styles.cardTitle}>Subscription</Text>
+              <View style={[styles.badge, me?.isPro ? styles.badgePro : styles.badgeFree]}>
+                <Text style={[styles.badgeText, me?.isPro ? styles.badgeTextPro : styles.badgeTextFree]}>
+                  {me?.isPro ? "Pro" : "Free"}
+                </Text>
+              </View>
+            </View>
+
+            {sub ? (
+              <View style={{ gap: 8, marginTop: 4 }}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Plan</Text>
+                  <Text style={styles.detailValue}>{formatPrice(sub.priceAmount, sub.currency, sub.interval)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>{sub.cancelAtPeriodEnd ? "Ends on" : "Renews on"}</Text>
+                  <Text style={styles.detailValue}>{formatDate(sub.currentPeriodEnd)}</Text>
+                </View>
+                {sub.cancelAtPeriodEnd && (
+                  <View style={styles.notice}>
+                    <Feather name="alert-circle" size={14} color="#B45309" />
+                    <Text style={styles.noticeText}>Cancellation scheduled. You'll keep Pro until {formatDate(sub.currentPeriodEnd)}.</Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={{ marginTop: 4 }}>
+                <Text style={styles.smallMuted}>
+                  You've used {me?.quoteCount ?? 0} of {me?.quoteLimit ?? 5} free quotes.
+                </Text>
+              </View>
+            )}
+
+            {info ? <Text style={styles.info}>{info}</Text> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <View style={{ gap: 10, marginTop: 14 }}>
+              {!me?.isPro && (
+                <Pressable style={styles.primaryBtn} onPress={() => router.push("/upgrade")}>
+                  <Feather name="zap" size={16} color="#fff" />
+                  <Text style={styles.primaryBtnText}>Upgrade to Pro</Text>
+                </Pressable>
+              )}
+
+              {sub && !sub.cancelAtPeriodEnd && (
+                <Pressable
+                  style={[styles.dangerBtn, busy && styles.btnDisabled]}
+                  onPress={() => setShowConfirm(true)}
+                  disabled={busy}
+                >
+                  {busy ? <ActivityIndicator color="#EF4444" /> : (
+                    <>
+                      <Feather name="x-circle" size={16} color="#EF4444" />
+                      <Text style={styles.dangerBtnText}>Cancel subscription</Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
+
+              {sub && sub.cancelAtPeriodEnd && (
+                <Pressable style={[styles.primaryBtn, busy && styles.btnDisabled]} onPress={handleResume} disabled={busy}>
+                  {busy ? <ActivityIndicator color="#fff" /> : (
+                    <>
+                      <Feather name="refresh-cw" size={16} color="#fff" />
+                      <Text style={styles.primaryBtnText}>Resume subscription</Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Account actions</Text>
+            <Pressable
+              style={styles.outlineBtn}
+              onPress={() => {
+                if (Platform.OS === "web") {
+                  if (confirm("Sign out of QuoteFlow?")) clerk.signOut();
+                } else {
+                  clerk.signOut();
+                }
+              }}
+            >
+              <Feather name="log-out" size={16} color="#111" />
+              <Text style={styles.outlineBtnText}>Sign out</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.footnote}>
+            Cancelling stops future renewals. You'll keep Pro access until the end of the current billing period and can resume any time before then.
+          </Text>
+        </>
+      )}
+
+      <Modal visible={showConfirm} transparent animationType="fade" onRequestClose={() => setShowConfirm(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowConfirm(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Cancel subscription?</Text>
+            <Text style={styles.modalBody}>
+              Your Pro access will continue until {formatDate(sub?.currentPeriodEnd ?? null)}. After that you'll go back to the free plan ({me?.quoteLimit ?? 5}-quote limit). You can resume any time before then.
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalBtn, styles.modalBtnGhost]} onPress={() => setShowConfirm(false)}>
+                <Text style={styles.modalBtnGhostText}>Keep Pro</Text>
+              </Pressable>
+              <Pressable style={[styles.modalBtn, styles.modalBtnDanger]} onPress={handleCancel}>
+                <Text style={styles.modalBtnDangerText}>Cancel subscription</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { padding: 20, paddingBottom: 60 },
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18, marginTop: 6 },
+  backBtn: { padding: 4 },
+  topTitle: { fontSize: 18, fontWeight: "700", color: "#111" },
+  card: { backgroundColor: "#fff", borderRadius: 16, padding: 18, borderWidth: 1, borderColor: "#EAEAEA", marginBottom: 14, gap: 10 },
+  cardTitle: { fontSize: 15, fontWeight: "700", color: "#111" },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  label: { fontSize: 12, color: "#666", fontWeight: "500" },
+  value: { fontSize: 15, color: "#111", fontWeight: "500" },
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  badgePro: { backgroundColor: "#FFF1E8" },
+  badgeFree: { backgroundColor: "#F1F5F9" },
+  badgeText: { fontSize: 12, fontWeight: "700" },
+  badgeTextPro: { color: "#FF6B35" },
+  badgeTextFree: { color: "#475569" },
+  detailRow: { flexDirection: "row", justifyContent: "space-between" },
+  detailLabel: { color: "#666", fontSize: 14 },
+  detailValue: { color: "#111", fontSize: 14, fontWeight: "600" },
+  smallMuted: { color: "#666", fontSize: 13 },
+  notice: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FFFBEB", borderColor: "#FDE68A", borderWidth: 1, padding: 10, borderRadius: 10, marginTop: 4 },
+  noticeText: { color: "#92400E", fontSize: 12.5, flex: 1, lineHeight: 17 },
+  info: { color: "#15803D", fontSize: 13, marginTop: 8 },
+  error: { color: "#D32F2F", fontSize: 13, marginTop: 8 },
+  primaryBtn: { backgroundColor: "#FF6B35", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 12 },
+  primaryBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  dangerBtn: { borderWidth: 1, borderColor: "#FECACA", backgroundColor: "#FEF2F2", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 12 },
+  dangerBtnText: { color: "#EF4444", fontSize: 15, fontWeight: "600" },
+  outlineBtn: { borderWidth: 1, borderColor: "#E5E7EB", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 12, backgroundColor: "#fff" },
+  outlineBtnText: { color: "#111", fontSize: 15, fontWeight: "600" },
+  btnDisabled: { opacity: 0.5 },
+  footnote: { fontSize: 11.5, color: "#999", textAlign: "center", marginTop: 4, lineHeight: 16, paddingHorizontal: 8 },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 24 },
+  modalCard: { width: "100%", maxWidth: 380, backgroundColor: "#fff", borderRadius: 16, padding: 20, gap: 10 },
+  modalTitle: { fontSize: 17, fontWeight: "700", color: "#111" },
+  modalBody: { fontSize: 14, color: "#444", lineHeight: 20 },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 10 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center" },
+  modalBtnGhost: { borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#fff" },
+  modalBtnGhostText: { color: "#111", fontWeight: "600" },
+  modalBtnDanger: { backgroundColor: "#EF4444" },
+  modalBtnDangerText: { color: "#fff", fontWeight: "700" },
+});
