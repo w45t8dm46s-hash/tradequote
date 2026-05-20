@@ -34,12 +34,28 @@ export async function ensureLocalUser(clerkUserId: string): Promise<{ id: string
   return row[0]!;
 }
 
+export async function getActiveProPriceIds(): Promise<string[]> {
+  const result = await db.execute(sql`
+    SELECT pr.id FROM stripe.prices pr
+    JOIN stripe.products p ON pr.product = p.id
+    WHERE pr.active = true AND p.active = true
+  `);
+  return result.rows.map((r: any) => r.id as string);
+}
+
 export async function hasActiveSubscription(stripeCustomerId: string | null): Promise<boolean> {
   if (!stripeCustomerId) return false;
+  // Tie entitlement strictly to a subscription on an active QuoteFlow price.
   const result = await db.execute(sql`
-    SELECT 1 FROM stripe.subscriptions
-    WHERE customer = ${stripeCustomerId}
-      AND status IN ('active', 'trialing')
+    SELECT 1
+    FROM stripe.subscriptions s
+    JOIN stripe.subscription_items si ON si.subscription = s.id
+    JOIN stripe.prices pr ON pr.id = si.price
+    JOIN stripe.products p ON p.id = pr.product
+    WHERE s.customer = ${stripeCustomerId}
+      AND s.status IN ('active', 'trialing')
+      AND pr.active = true
+      AND p.active = true
     LIMIT 1
   `);
   return result.rows.length > 0;

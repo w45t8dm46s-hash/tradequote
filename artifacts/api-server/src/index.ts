@@ -34,10 +34,20 @@ async function initStripe() {
     }
 
     // Backfill in background — don't block server startup
-    stripeSync
-      .syncBackfill()
-      .then(() => logger.info("Stripe backfill complete"))
-      .catch((err) => logger.error({ err }, "Stripe backfill failed"));
+    (async () => {
+      try {
+        const products = await stripeSync.syncProducts();
+        const prices = await stripeSync.syncPrices();
+        const subs = await stripeSync.syncSubscriptions();
+        const customers = await stripeSync.syncCustomers();
+        logger.info(
+          { products: products.synced, prices: prices.synced, subscriptions: subs.synced, customers: customers.synced },
+          "Stripe backfill complete",
+        );
+      } catch (err) {
+        logger.error({ err }, "Stripe backfill failed");
+      }
+    })();
   } catch (err) {
     logger.error({ err }, "Stripe init failed - server will still start");
   }

@@ -58,7 +58,26 @@ app.post(
 );
 
 // 3. CORS + body parsers
-app.use(cors({ credentials: true, origin: true }));
+// Restrict CORS to trusted origins only. In dev we allow the Replit dev/expo
+// domains; in production we allow the deployed REPLIT_DOMAINS.
+const allowedOrigins = new Set<string>();
+for (const d of (process.env.REPLIT_DOMAINS?.split(",") ?? [])) {
+  if (d) allowedOrigins.add(`https://${d.trim()}`);
+}
+if (process.env.REPLIT_DEV_DOMAIN) allowedOrigins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
+if (process.env.REPLIT_EXPO_DEV_DOMAIN) allowedOrigins.add(`https://${process.env.REPLIT_EXPO_DEV_DOMAIN}`);
+
+app.use(
+  cors({
+    credentials: true,
+    origin: (origin, cb) => {
+      // Allow same-origin / server-to-server requests (no Origin header).
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      return cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
+  }),
+);
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 

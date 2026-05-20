@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { requireAuth, type AuthedRequest } from "../lib/requireAuth";
+import { requireAuth, getActiveProPriceIds, type AuthedRequest } from "../lib/requireAuth";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 
 const router = Router();
@@ -40,6 +40,12 @@ router.post("/stripe/checkout", requireAuth, async (req, res) => {
     const userEmail = (req as AuthedRequest).userEmail;
     const { priceId, returnUrl } = req.body as { priceId?: string; returnUrl?: string };
     if (!priceId) return res.status(400).json({ error: "priceId required" });
+
+    // Server-side allowlist: only accept currently-active QuoteFlow prices.
+    const allowed = await getActiveProPriceIds();
+    if (!allowed.includes(priceId)) {
+      return res.status(400).json({ error: "Invalid priceId" });
+    }
 
     const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user) return res.status(404).json({ error: "User not found" });

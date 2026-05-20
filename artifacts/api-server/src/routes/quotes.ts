@@ -1,7 +1,7 @@
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { Router } from "express";
 import { db, users } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { requireAuth, hasActiveSubscription, FREE_QUOTE_LIMIT, type AuthedRequest } from "../lib/requireAuth";
 
 const router = Router();
@@ -12,13 +12,32 @@ router.post("/quotes/generate", requireAuth, async (req, res) => {
   if (!user) return res.status(404).json({ error: "User not found" });
 
   const isPro = await hasActiveSubscription(user.stripeCustomerId);
-  if (!isPro && user.quoteCount >= FREE_QUOTE_LIMIT) {
-    return res.status(402).json({
-      error: "upgrade_required",
-      message: `Free plan includes ${FREE_QUOTE_LIMIT} quotes. Upgrade to Pro for unlimited quotes.`,
-      quoteCount: user.quoteCount,
-      quoteLimit: FREE_QUOTE_LIMIT,
-    });
+
+  // Atomic reservation: increment the count only if either Pro or under the
+  // free limit. This prevents race conditions at the boundary.
+  let reservedCount = user.quoteCount;
+  if (isPro) {
+    const [updated] = await db
+      .update(users)
+      .set({ quoteCount: sql`${users.quoteCount} + 1` })
+      .where(eq(users.id, userId))
+      .returning({ quoteCount: users.quoteCount });
+    reservedCount = updated?.quoteCount ?? user.quoteCount + 1;
+  } else {
+    const updated = await db
+      .update(users)
+      .set({ quoteCount: sql`${users.quoteCount} + 1` })
+      .where(and(eq(users.id, userId), sql`${users.quoteCount} < ${FREE_QUOTE_LIMIT}`))
+      .returning({ quoteCount: users.quoteCount });
+    if (updated.length === 0) {
+      return res.status(402).json({
+        error: "upgrade_required",
+        message: `Free plan includes ${FREE_QUOTE_LIMIT} quotes. Upgrade to Pro for unlimited quotes.`,
+        quoteCount: user.quoteCount,
+        quoteLimit: FREE_QUOTE_LIMIT,
+      });
+    }
+    reservedCount = updated[0].quoteCount;
   }
 
   const { jobType, customerName, customerAddress, description, measurements, notes, photos } = req.body;
@@ -89,15 +108,17 @@ Guidelines:
     const jsonText = block.text.trim().replace(/^```json\n?/, "").replace(/\n?```$/, "");
     const data = JSON.parse(jsonText);
 
-    // Increment quote count on success
-    await db
-      .update(users)
-      .set({ quoteCount: user.quoteCount + 1 })
-      .where(eq(users.id, userId));
-
-    res.json(data);
+    res.json({ ...data, quoteCount: reservedCount });
   } catch (err) {
     console.error("Quote generation error:", err);
+    // Refund the reservation on failure so users aren't charged a quote slot
+    // when generation fails.
+    if (!isPro) {
+      await db
+        .update(users)
+        .set({ quoteCount: sql`GREATEST(${users.quoteCount} - 1, 0)` })
+        .where(eq(users.id, userId));
+    }
     res.status(500).json({ error: "Failed to generate quote" });
   }
 });
