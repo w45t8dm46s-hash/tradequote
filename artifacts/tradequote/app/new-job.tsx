@@ -28,22 +28,37 @@ export default function NewJobScreen() {
   const insets = useSafeAreaInsets();
   const { addJob } = useJobs();
   const { customers } = useCustomers();
-  const params = useLocalSearchParams<{ customerId?: string; quoteId?: string }>();
+  const params = useLocalSearchParams<{ customerId?: string; quoteId?: string; customerName?: string; address?: string; materials?: string }>();
   const isWeb = Platform.OS === "web";
 
-  const [customerName, setCustomerName] = useState("");
+  const [customerName, setCustomerName] = useState(params.customerName ?? "");
   const [customerId, setCustomerId] = useState(params.customerId ?? "");
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState(params.address ?? "");
   const [jobType, setJobType] = useState("rewire");
   const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split("T")[0]);
   const [scheduledTime, setScheduledTime] = useState("09:00");
   const [notes, setNotes] = useState("");
-  const [materials, setMaterials] = useState<Material[]>([]);
+  const [materials, setMaterials] = useState<Material[]>(() => {
+    if (!params.materials) return [];
+    try {
+      const parsed = JSON.parse(params.materials) as Array<{ name: string; quantity?: number; unit?: string }>;
+      return parsed.map((m) => ({
+        id: genId(),
+        name: m.name,
+        quantity: m.quantity ?? 1,
+        unit: m.unit ?? "units",
+        cost: 0,
+        ordered: false,
+      }));
+    } catch {
+      return [];
+    }
+  });
   const [newMaterial, setNewMaterial] = useState("");
   const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => {
-    if (params.customerId) {
+    if (params.customerId && !params.customerName) {
       const c = customers.find((c) => c.id === params.customerId);
       if (c) { setCustomerName(c.name); setAddress(c.address); setCustomerId(c.id); }
     }

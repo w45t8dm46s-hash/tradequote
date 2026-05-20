@@ -157,7 +157,16 @@ export default function QuoteDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
-            onPress={() => router.push({ pathname: "/new-job", params: { quoteId: quote.id } })}
+            onPress={() => router.push({
+              pathname: "/new-job",
+              params: {
+                quoteId: quote.id,
+                customerId: quote.customerId ?? "",
+                customerName: quote.customerName,
+                address: quote.customerAddress ?? "",
+                materials: JSON.stringify(quote.lineItems.map((li) => ({ name: li.description, quantity: li.quantity, unit: li.unit }))),
+              },
+            })}
             activeOpacity={0.8}
           >
             <Feather name="calendar" size={16} color={colors.text} />
