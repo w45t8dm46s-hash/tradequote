@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type JobStatus, useJobs } from "@/context/JobsContext";
 import { useColors } from "@/hooks/useColors";
+import { getApiBaseUrl } from "@/lib/api";
 
 const STATUS_OPTIONS: { value: JobStatus; label: string; color: string }[] = [
   { value: "scheduled", label: "Scheduled", color: "#3B82F6" },
@@ -50,8 +51,7 @@ export default function JobDetailScreen() {
     setGeneratingFollowUp(true);
     setFollowUpMessage("");
     try {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN;
-      const baseUrl = domain ? `https://${domain}` : "";
+      const baseUrl = getApiBaseUrl();
       const res = await fetch(`${baseUrl}/api/follow-up`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -12,10 +12,7 @@ type PriceInfo = {
   productName: string;
 };
 
-function getBaseUrl() {
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return domain ? `https://${domain}` : "";
-}
+import { getApiBaseUrl as getBaseUrl } from "@/lib/api";
 
 export default function UpgradeScreen() {
   const { getToken } = useAuth();

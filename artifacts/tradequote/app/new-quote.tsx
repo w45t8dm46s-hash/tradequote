@@ -19,6 +19,8 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { getApiBaseUrl } from "@/lib/api";
+
 import { useCustomers } from "@/context/CustomersContext";
 import { type Quote, useQuotes } from "@/context/QuotesContext";
 import { useColors } from "@/hooks/useColors";
@@ -108,8 +110,7 @@ export default function NewQuoteScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN;
-      const baseUrl = domain ? `https://${domain}` : "";
+      const baseUrl = getApiBaseUrl();
 
       const photoBase64 = photos
         .filter((p) => p.base64)
