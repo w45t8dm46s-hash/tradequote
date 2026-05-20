@@ -14,6 +14,8 @@ const fs = require("fs");
 const path = require("path");
 
 const STATIC_ROOT = path.resolve(__dirname, "..", "static-build");
+const WEB_ROOT = path.resolve(STATIC_ROOT, "web");
+const HAS_WEB_BUILD = fs.existsSync(path.join(WEB_ROOT, "index.html"));
 const TEMPLATE_PATH = path.resolve(__dirname, "templates", "landing-page.html");
 const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
 
@@ -81,27 +83,43 @@ function serveLandingPage(req, res, landingPageTemplate, appName) {
   res.end(html);
 }
 
-function serveStaticFile(urlPath, res) {
+function tryServeFrom(root, urlPath, res) {
   const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, "");
-  const filePath = path.join(STATIC_ROOT, safePath);
-
-  if (!filePath.startsWith(STATIC_ROOT)) {
-    res.writeHead(403);
-    res.end("Forbidden");
-    return;
-  }
-
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    res.writeHead(404);
-    res.end("Not Found");
-    return;
-  }
-
+  const filePath = path.join(root, safePath);
+  if (!filePath.startsWith(root)) return false;
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return false;
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
   const content = fs.readFileSync(filePath);
   res.writeHead(200, { "content-type": contentType });
   res.end(content);
+  return true;
+}
+
+function serveStaticFile(urlPath, res, req) {
+  if (HAS_WEB_BUILD && tryServeFrom(WEB_ROOT, urlPath, res)) return;
+  if (tryServeFrom(STATIC_ROOT, urlPath, res)) return;
+  if (HAS_WEB_BUILD) {
+    const hasExtension = path.extname(urlPath) !== "";
+    const accept = (req?.headers?.accept || "").toLowerCase();
+    const isRouteRequest = !hasExtension || accept.includes("text/html");
+    if (isRouteRequest) {
+      const indexPath = path.join(WEB_ROOT, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(fs.readFileSync(indexPath));
+        return;
+      }
+    }
+  }
+  res.writeHead(404);
+  res.end("Not Found");
+}
+
+function serveWebIndex(res) {
+  const indexPath = path.join(WEB_ROOT, "index.html");
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+  res.end(fs.readFileSync(indexPath));
 }
 
 const landingPageTemplate = fs.readFileSync(TEMPLATE_PATH, "utf-8");
@@ -122,11 +140,12 @@ const server = http.createServer((req, res) => {
     }
 
     if (pathname === "/") {
+      if (HAS_WEB_BUILD) return serveWebIndex(res);
       return serveLandingPage(req, res, landingPageTemplate, appName);
     }
   }
 
-  serveStaticFile(pathname, res);
+  serveStaticFile(pathname, res, req);
 });
 
 const port = parseInt(process.env.PORT || "3000", 10);

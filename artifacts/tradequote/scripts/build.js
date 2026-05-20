@@ -511,6 +511,33 @@ function updateManifests(manifests, timestamp, baseUrl, assetsByHash) {
   console.log("Manifests updated");
 }
 
+async function exportWeb(domain, expoPublicReplId) {
+  console.log("Exporting Expo Web bundle...");
+  const clerkProxyUrl = process.env.CLERK_PROXY_URL
+    ? `https://${domain}${process.env.CLERK_PROXY_URL}`
+    : "";
+  const env = {
+    ...process.env,
+    EXPO_PUBLIC_DOMAIN: domain,
+    EXPO_PUBLIC_REPL_ID: expoPublicReplId || "",
+    EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY || "",
+    EXPO_PUBLIC_CLERK_PROXY_URL: clerkProxyUrl,
+  };
+  const outputDir = path.join(projectRoot, "static-build", "web");
+  await new Promise((resolve, reject) => {
+    const proc = spawn(
+      "pnpm",
+      ["exec", "expo", "export", "-p", "web", "--output-dir", outputDir],
+      { cwd: projectRoot, env, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    proc.stdout?.on("data", (d) => process.stdout.write(`[expo-web] ${d}`));
+    proc.stderr?.on("data", (d) => process.stderr.write(`[expo-web] ${d}`));
+    proc.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`expo export -p web exited with code ${code}`)));
+    proc.on("error", reject);
+  });
+  console.log("Web export complete at", outputDir);
+}
+
 async function main() {
   console.log("Building static Expo Go deployment...");
 
@@ -523,6 +550,8 @@ async function main() {
 
   prepareDirectories(timestamp);
   clearMetroCache();
+
+  await exportWeb(domain, expoPublicReplId);
 
   await startMetro(domain, expoPublicReplId);
 
