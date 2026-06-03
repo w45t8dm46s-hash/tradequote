@@ -19,10 +19,13 @@ export default function ForgotPasswordScreen() {
     setInfo("");
     setBusy(true);
     try {
-      await signIn.create({
-        strategy: "reset_password_email_code",
+      const { error: sendError } = await (signIn.resetPasswordEmailCode as any).sendCode({
         identifier: email,
       });
+      if (sendError) {
+        setError(sendError.message ?? "Could not send reset code.");
+        return;
+      }
       setStage("verify");
       setInfo("We sent a 6-digit code to your email.");
     } catch (e: any) {
@@ -36,12 +39,23 @@ export default function ForgotPasswordScreen() {
     setError("");
     setBusy(true);
     try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: "reset_password_email_code",
+      const { error: verifyError } = await (signIn.resetPasswordEmailCode as any).verifyCode({
         code,
+      });
+      if (verifyError) {
+        setError(verifyError.message ?? "Invalid code. Please try again.");
+        return;
+      }
+
+      const { error: passwordError } = await (signIn.resetPasswordEmailCode as any).submitPassword({
         password: newPassword,
       });
-      if (result?.status === "complete") {
+      if (passwordError) {
+        setError(passwordError.message ?? "Could not set new password.");
+        return;
+      }
+
+      if (signIn.status === "complete") {
         await signIn.finalize({
           navigate: ({ decorateUrl }) => {
             const url = decorateUrl("/(tabs)");
