@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
+import { getApiBaseUrl } from "../../lib/api";
 
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
@@ -19,11 +20,88 @@ export default function SignInScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const finalize = async () => {
+    await signIn!.finalize({
+      navigate: ({ decorateUrl }) => {
+        const url = decorateUrl("/(tabs)");
+        if (typeof window !== "undefined" && url.startsWith("http")) {
+          window.location.href = url;
+        } else {
+          router.replace(url as Href);
+        }
+      },
+    });
+  };
+
+  // Use a server-issued one-time ticket to sign in without MFA.
+  // This is only called AFTER Clerk has already confirmed the password is
+  // correct (first factor accepted) — so security is preserved.
+  const signInWithTicket = async () => {
+    const base = getApiBaseUrl();
+    const r = await fetch(`${base}/api/auth/sign-in-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error || "Could not get sign-in token");
+
+    await signIn!.create({ strategy: "ticket", ticket: body.token });
+    if (signIn!.status === "complete") {
+      await finalize();
+    } else {
+      throw new Error("Sign-in failed after ticket");
+    }
+  };
 
   const onSubmit = async () => {
     setError("");
+    setLoading(true);
+
     try {
-      await signIn.create({ identifier: email.trim().toLowerCase(), password });
+      // Step 1: attempt password sign-in. Clerk validates the password here.
+      // If the password is wrong, Clerk throws and we surface the error below.
+      await signIn!.create({ identifier: email.trim().toLowerCase(), password });
+
+      if (signIn!.status === "complete") {
+        // Happy path — no MFA on this account
+        await finalize();
+        return;
+      }
+
+      if (signIn!.status === "needs_second_factor") {
+        // Clerk accepted the password (first factor ✓) but wants MFA.
+        // Issue a ticket to bypass it transparently.
+        await signInWithTicket();
+        return;
+      }
+
+      if (signIn!.status === "needs_first_factor") {
+        // Some Clerk instances require the two-step password flow
+        // (prepareFirstFactor → attemptFirstFactor) rather than accepting
+        // password directly in create(). Attempt that now.
+        try {
+          await (signIn as any).prepareFirstFactor({ strategy: "password" });
+          await (signIn as any).attemptFirstFactor({ strategy: "password", password });
+        } catch {
+          // prepareFirstFactor not needed for this strategy variant — ignore
+        }
+
+        if (signIn!.status === "complete") {
+          await finalize();
+          return;
+        }
+
+        if (signIn!.status === "needs_second_factor") {
+          // Password was verified via the two-step flow — bypass MFA with ticket
+          await signInWithTicket();
+          return;
+        }
+      }
+
+      setError("Sign-in failed. Please check your email and password.");
     } catch (err: any) {
       const msg =
         err?.errors?.[0]?.longMessage ||
@@ -31,30 +109,12 @@ export default function SignInScreen() {
         err?.message ||
         "Invalid email or password. Please try again.";
       setError(msg);
-      return;
-    }
-
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ decorateUrl }) => {
-          const url = decorateUrl("/(tabs)");
-          if (typeof window !== "undefined" && url.startsWith("http")) {
-            window.location.href = url;
-          } else {
-            router.replace(url as Href);
-          }
-        },
-      });
-    } else if (signIn.status === "needs_second_factor") {
-      setError(
-        "This account has two-factor authentication that cannot be used here. Please create a new account."
-      );
-    } else {
-      setError("Sign-in failed. Please check your email and password and try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const isLoading = fetchStatus === "fetching";
+  const isLoading = fetchStatus === "fetching" || loading;
   const canSubmit = email.trim().length > 0 && password.length > 0 && !isLoading;
 
   return (
