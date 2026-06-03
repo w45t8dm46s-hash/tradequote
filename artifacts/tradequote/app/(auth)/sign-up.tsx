@@ -1,144 +1,272 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from "react-native";
 import { useSignUp } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
 
+type Step = "details" | "verify";
+
 export default function SignUpScreen() {
-  const { signUp, errors, fetchStatus } = useSignUp();
+  const { signUp, fetchStatus } = useSignUp();
   const router = useRouter();
+  const [step, setStep] = useState<Step>("details");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [generalError, setGeneralError] = useState("");
+  const [error, setError] = useState("");
+
+  const finalizeSignUp = async () => {
+    await signUp.finalize({
+      navigate: ({ decorateUrl }) => {
+        const url = decorateUrl("/(tabs)");
+        if (typeof window !== "undefined" && url.startsWith("http")) {
+          window.location.href = url;
+        } else {
+          router.replace(url as Href);
+        }
+      },
+    });
+  };
 
   const onCreate = async () => {
-    setGeneralError("");
-    const { error } = await signUp.password({ emailAddress: email, password });
-    if (error) {
-      setGeneralError(error.message || "Could not create account");
+    setError("");
+    const { error: createError } = await signUp.password({
+      emailAddress: email.trim().toLowerCase(),
+      password,
+    });
+    if (createError) {
+      setError(createError.message || "Could not create account. Please try again.");
       return;
     }
-    await signUp.verifications.sendEmailCode();
+
+    if (signUp.status === "complete") {
+      await finalizeSignUp();
+      return;
+    }
+
+    const needsEmailVerification =
+      signUp.unverifiedFields?.includes("email_address") ||
+      signUp.status === "missing_requirements";
+
+    if (needsEmailVerification) {
+      try {
+        await signUp.verifications.sendEmailCode();
+        setStep("verify");
+      } catch (err: any) {
+        const msg =
+          err?.errors?.[0]?.message ||
+          err?.message ||
+          "Could not send verification email. Please try again.";
+        setError(msg);
+      }
+      return;
+    }
+
+    setError("Account creation failed. Please try again.");
   };
 
   const onVerify = async () => {
-    setGeneralError("");
-    await signUp.verifications.verifyEmailCode({ code });
+    setError("");
+    try {
+      await signUp.verifications.verifyEmailCode({ code });
+    } catch (err: any) {
+      const msg =
+        err?.errors?.[0]?.longMessage ||
+        err?.errors?.[0]?.message ||
+        err?.message ||
+        "Invalid code. Please try again.";
+      setError(msg);
+      return;
+    }
+
     if (signUp.status === "complete") {
-      await signUp.finalize({
-        navigate: ({ decorateUrl }) => {
-          const url = decorateUrl("/(tabs)");
-          if (typeof window !== "undefined" && url.startsWith("http")) {
-            window.location.href = url;
-          } else {
-            router.replace(url as Href);
-          }
-        },
-      });
+      await finalizeSignUp();
     } else {
-      setGeneralError("Verification incomplete. Try again.");
+      setError("Verification incomplete. Please try again.");
+    }
+  };
+
+  const onResend = async () => {
+    setError("");
+    try {
+      await signUp.verifications.sendEmailCode();
+    } catch {
     }
   };
 
   const isLoading = fetchStatus === "fetching";
-  const needsVerification =
-    signUp.status === "missing_requirements" &&
-    signUp.unverifiedFields.includes("email_address") &&
-    signUp.missingFields.length === 0;
 
-  if (signUp.status === "complete") return null;
+  if (step === "verify") {
+    return (
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.brand}>QuoteFlow</Text>
+          <Text style={styles.title}>Check your email</Text>
+          <Text style={styles.subtitle}>
+            We sent a 6-digit code to {email}. Enter it below to activate your account.
+          </Text>
+
+          <Text style={styles.label}>Verification code</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="number-pad"
+            placeholder="123456"
+            placeholderTextColor="#999"
+            value={code}
+            onChangeText={setCode}
+            maxLength={6}
+            autoFocus
+            returnKeyType="go"
+            onSubmitEditing={code.length === 6 ? onVerify : undefined}
+          />
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <Pressable
+            style={[styles.button, (!code || isLoading) && styles.buttonDisabled]}
+            onPress={onVerify}
+            disabled={!code || isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Verify & continue</Text>
+            )}
+          </Pressable>
+
+          <Pressable style={styles.secondaryButton} onPress={onResend}>
+            <Text style={styles.secondaryText}>Resend code</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => { setStep("details"); setCode(""); setError(""); }}
+            style={styles.linkRow}
+          >
+            <Text style={styles.link}>← Use a different email</Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  const canSubmit =
+    email.trim().length > 0 && password.length >= 8 && !isLoading;
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: "#FAFAFA" }}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.flex}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.brand}>QuoteFlow</Text>
+        <Text style={styles.title}>Create your account</Text>
+        <Text style={styles.subtitle}>Get 5 free quotes — no card required.</Text>
 
-        {needsVerification ? (
-          <>
-            <Text style={styles.title}>Check your email</Text>
-            <Text style={styles.subtitle}>We sent a verification code to {email}.</Text>
-            <Text style={styles.label}>Verification code</Text>
-            <TextInput
-              style={styles.input}
-              value={code}
-              onChangeText={setCode}
-              keyboardType="numeric"
-              placeholder="123456"
-              placeholderTextColor="#999"
-            />
-            {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
-            {generalError ? <Text style={styles.error}>{generalError}</Text> : null}
-            <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={onVerify} disabled={isLoading}>
-              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Verify & continue</Text>}
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => signUp.verifications.sendEmailCode()}>
-              <Text style={styles.secondaryText}>Resend code</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <Text style={styles.title}>Create your account</Text>
-            <Text style={styles.subtitle}>Get 5 free quotes — no card required.</Text>
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          placeholder="you@example.com"
+          placeholderTextColor="#999"
+          value={email}
+          onChangeText={setEmail}
+          returnKeyType="next"
+        />
 
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              placeholder="you@example.com"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-            />
-            {errors.fields.emailAddress && <Text style={styles.error}>{errors.fields.emailAddress.message}</Text>}
-
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              placeholder="At least 8 characters"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={setPassword}
-            />
-            {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
-
-            {generalError ? <Text style={styles.error}>{generalError}</Text> : null}
-
-            <Pressable
-              style={[styles.button, (!email || !password || isLoading) && styles.buttonDisabled]}
-              onPress={onCreate}
-              disabled={!email || !password || isLoading}
-            >
-              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create account</Text>}
-            </Pressable>
-
-            <View style={styles.linkRow}>
-              <Text style={styles.linkLabel}>Already have an account? </Text>
-              <Link href="/(auth)/sign-in"><Text style={styles.link}>Sign in</Text></Link>
-            </View>
-            <View nativeID="clerk-captcha" />
-          </>
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          style={styles.input}
+          secureTextEntry
+          textContentType="newPassword"
+          placeholder="At least 8 characters"
+          placeholderTextColor="#999"
+          value={password}
+          onChangeText={setPassword}
+          returnKeyType="go"
+          onSubmitEditing={canSubmit ? onCreate : undefined}
+        />
+        {password.length > 0 && password.length < 8 && (
+          <Text style={styles.hint}>Password must be at least 8 characters</Text>
         )}
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <Pressable
+          style={[styles.button, !canSubmit && styles.buttonDisabled]}
+          onPress={onCreate}
+          disabled={!canSubmit}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Create account</Text>
+          )}
+        </Pressable>
+
+        <View style={styles.linkRow}>
+          <Text style={styles.linkLabel}>Already have an account? </Text>
+          <Link href="/(auth)/sign-in">
+            <Text style={styles.link}>Sign in</Text>
+          </Link>
+        </View>
+
+        <View nativeID="clerk-captcha" />
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: "#FAFAFA" },
   container: { padding: 24, paddingTop: 80, gap: 8 },
   brand: { fontSize: 28, fontWeight: "700", color: "#FF6B35", marginBottom: 32 },
   title: { fontSize: 32, fontWeight: "700", color: "#111" },
   subtitle: { fontSize: 16, color: "#666", marginBottom: 32 },
   label: { fontSize: 14, fontWeight: "600", color: "#333", marginTop: 16 },
-  input: { borderWidth: 1, borderColor: "#E0E0E0", borderRadius: 12, padding: 14, fontSize: 16, backgroundColor: "#fff", marginTop: 6 },
-  error: { color: "#D32F2F", fontSize: 13, marginTop: 6 },
-  button: { backgroundColor: "#FF6B35", padding: 16, borderRadius: 12, alignItems: "center", marginTop: 24 },
-  buttonDisabled: { opacity: 0.5 },
+  input: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    backgroundColor: "#fff",
+    marginTop: 6,
+  },
+  hint: { color: "#888", fontSize: 12, marginTop: 4 },
+  error: { color: "#D32F2F", fontSize: 13, marginTop: 10, lineHeight: 18 },
+  button: {
+    backgroundColor: "#FF6B35",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 24,
+  },
+  buttonDisabled: { opacity: 0.45 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  secondaryButton: { padding: 14, alignItems: "center", marginTop: 12 },
+  secondaryButton: { padding: 14, alignItems: "center", marginTop: 8 },
   secondaryText: { color: "#FF6B35", fontWeight: "600" },
-  linkRow: { flexDirection: "row", justifyContent: "center", marginTop: 24 },
+  linkRow: { flexDirection: "row", justifyContent: "center", marginTop: 20 },
   linkLabel: { color: "#666" },
   link: { color: "#FF6B35", fontWeight: "600" },
 });
