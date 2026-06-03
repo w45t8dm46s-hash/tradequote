@@ -12,9 +12,9 @@ export default function SignInScreen() {
 
   const onSubmit = async () => {
     setGeneralError("");
-    const { error } = await signIn.password({ emailAddress: email, password });
+    const { error } = await signIn.create({ identifier: email, password });
     if (error) {
-      setGeneralError(error.message || "Sign-in failed");
+      setGeneralError(error.message || "Invalid email or password.");
       return;
     }
     if (signIn.status === "complete") {
@@ -28,8 +28,10 @@ export default function SignInScreen() {
           }
         },
       });
+    } else if (signIn.status === "needs_first_factor" || signIn.status === "needs_second_factor") {
+      setGeneralError("Additional verification required. Please contact support.");
     } else {
-      setGeneralError("Sign-in could not be completed. Try again.");
+      setGeneralError("Sign-in could not be completed. Please check your email and password.");
     }
   };
 
