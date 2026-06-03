@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
 import { type BusinessSettings, useSettings } from "@/context/SettingsContext";
+import TradePicker from "@/components/TradePicker";
+import { TRADES, getTradeById } from "@/lib/trades";
 
 const BRAND_PRESETS = ["#FF6B35", "#2563EB", "#16A34A", "#0F172A", "#9333EA", "#DC2626"];
 
@@ -14,6 +16,7 @@ export default function SettingsScreen() {
   const { settings, updateSettings, loading } = useSettings();
   const [local, setLocal] = useState<BusinessSettings>(settings);
   const [saved, setSaved] = useState(false);
+  const [showTradePicker, setShowTradePicker] = useState(false);
 
   useEffect(() => { if (!loading) setLocal(settings); }, [loading, settings]);
 
@@ -45,7 +48,13 @@ export default function SettingsScreen() {
         <View style={{ width: 22 }} />
       </View>
 
+      <TradePicker visible={showTradePicker} onDismiss={() => setShowTradePicker(false)} />
+
       <Text style={styles.lede}>These details appear on the PDF quotes you send to customers. Set your hourly rate so AI-generated quotes match the way you work.</Text>
+
+      <Section title="Your trade">
+        <TradeRow trade={settings.trade} onPress={() => setShowTradePicker(true)} />
+      </Section>
 
       <Section title="Branding">
         <View style={styles.logoRow}>
@@ -143,6 +152,36 @@ export default function SettingsScreen() {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+  );
+}
+
+function TradeRow({ trade, onPress }: { trade: string; onPress: () => void }) {
+  const current = getTradeById(trade) ?? TRADES[0];
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: "#fff",
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: "#E5E7EB",
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          gap: 12,
+          opacity: pressed ? 0.7 : 1,
+        },
+      ]}
+    >
+      <Text style={{ fontSize: 28 }}>{current.emoji}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 15, fontWeight: "600", color: "#111" }}>{current.label}</Text>
+        <Text style={{ fontSize: 12, color: "#888", marginTop: 1 }}>Tap to change trade</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color="#9CA3AF" />
+    </Pressable>
   );
 }
 

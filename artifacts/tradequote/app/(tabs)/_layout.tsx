@@ -7,11 +7,13 @@ import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import TradePicker from "@/components/TradePicker";
 
 export default function TabLayout() {
   const { isSignedIn, isLoaded } = useAuth();
   const colors = useColors();
   const colorScheme = useColorScheme();
+  const [showTradePicker, setShowTradePicker] = React.useState(true);
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
   const isDark = colorScheme === "dark";
@@ -19,6 +21,8 @@ export default function TabLayout() {
   const isWeb = Platform.OS === "web";
 
   return (
+    <>
+    <TradePicker visible={showTradePicker} onDismiss={() => setShowTradePicker(false)} />
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
@@ -109,5 +113,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

@@ -53,13 +53,16 @@ router.post("/quotes/generate", requireAuth, async (req, res) => {
     reservedCount = updated[0].quoteCount;
   }
 
-  const { jobType, customerName, customerAddress, description, measurements, notes, photos, labourRate, vatRate, vatRegistered, validDays } = req.body;
+  const { trade, tradeLabel, tradePromptContext, tradeTypicalItems, jobType, customerName, customerAddress, description, measurements, notes, photos, labourRate, vatRate, vatRegistered, validDays } = req.body;
 
   const labourRateNum = Number.isFinite(Number(labourRate)) && Number(labourRate) > 0 ? Number(labourRate) : null;
   const effectiveVatRate = vatRegistered === false ? 0 : (Number.isFinite(Number(vatRate)) && Number(vatRate) >= 0 ? Number(vatRate) : 20);
   const effectiveValidDays = Number.isFinite(Number(validDays)) && Number(validDays) > 0 ? Number(validDays) : 30;
+  const effectiveTrade = tradeLabel || "tradesperson";
+  const effectiveTradeContext = tradePromptContext || "UK tradesperson. Comply with all relevant regulations and British Standards.";
+  const effectiveTypicalItems = tradeTypicalItems || "labour, materials, equipment, consumables";
 
-  const textPrompt = `You are an expert quoting assistant for UK electricians. Generate a detailed, professional quote based on the following electrical job information. All work must be compliant with BS 7671 (18th Edition Wiring Regulations) and Part P of the UK Building Regulations.
+  const textPrompt = `You are an expert quoting assistant for UK tradespeople. Generate a detailed, professional quote for a ${effectiveTrade}. ${effectiveTradeContext}
 
 Job Type: ${jobType}
 Customer Name: ${customerName}
@@ -70,7 +73,7 @@ ${notes ? `Additional Notes: ${notes}` : ""}
 ${labourRateNum ? `Tradesperson hourly labour rate: £${labourRateNum.toFixed(2)}/hour (USE THIS EXACT RATE for all labour line items)` : ""}
 VAT handling: ${vatRegistered === false ? "Tradesperson is NOT VAT registered — set taxRate to 0 and taxAmount to 0." : `Tradesperson is VAT registered — apply ${effectiveVatRate}% VAT.`}
 Quote validity: ${effectiveValidDays} days
-${photos?.length ? `\nNote: ${photos.length} photo(s) have been provided. Please analyse them carefully to identify existing electrical fittings, cable types, consumer unit condition, accessory makes/models, and any safety or scope-of-work concerns visible in the images.` : ""}
+${photos?.length ? `\nNote: ${photos.length} photo(s) have been provided. Please analyse them carefully to identify existing materials, fittings, conditions, makes/models, and any safety or scope-of-work concerns visible in the images. Use this to inform realistic pricing for a ${effectiveTrade}.` : ""}
 
 Return ONLY a valid JSON object with this exact structure (no markdown, no explanation, just JSON):
 {
@@ -93,13 +96,13 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no expla
 }
 
 Guidelines:
-- Generate 3-8 line items specific and realistic for UK electrical work
-- ${labourRateNum ? `For LABOUR line items, use the rate £${labourRateNum.toFixed(2)}/hour exactly as provided above.` : "Use realistic UK electrician labour rates (£45-£75/hr typical)."}
+- Generate 3-8 line items specific and realistic for UK ${effectiveTrade} work
+- ${labourRateNum ? `For LABOUR line items, use the rate £${labourRateNum.toFixed(2)}/hour exactly as provided above.` : `Use realistic UK ${effectiveTrade} labour rates for the current market.`}
 - Materials at realistic UK trade prices
-- Include appropriate items such as: labour, cable (e.g. 2.5mm² T&E, 6mm² T&E, 6242Y), accessories (sockets, switches, back boxes), consumer unit components (RCBOs, MCBs), testing & certification (EIC or Minor Works), notification to building control where required (Part P)
-- If photos are provided, identify visible fittings (e.g. brand/style of socket, condition of consumer unit, cable type) and price accordingly
-- Include testing/certification as a separate line item where appropriate
-- The customerSummary should be professional, reassuring, and mention safety/compliance
+- Include appropriate items such as: ${effectiveTypicalItems}
+- If photos are provided, identify visible materials, fittings, condition, and scope-of-work concerns and price accordingly
+- Include any inspection, certification, or sign-off as a separate line item where appropriate
+- The customerSummary should be professional, reassuring, and mention quality/compliance
 - All monetary values should be realistic for the UK market
 - Separate labour and materials as distinct line items where appropriate
 - taxRate MUST be exactly ${effectiveVatRate}; taxAmount = subtotal × ${(effectiveVatRate / 100).toFixed(2)}; validDays MUST be ${effectiveValidDays}`;

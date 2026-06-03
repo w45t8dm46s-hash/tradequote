@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 export interface BusinessSettings {
+  trade: string;
   businessName: string;
   tradingAs: string;
   address: string;
@@ -25,6 +26,7 @@ export interface BusinessSettings {
 }
 
 const DEFAULTS: BusinessSettings = {
+  trade: "",
   businessName: "",
   tradingAs: "",
   address: "",
@@ -44,7 +46,7 @@ const DEFAULTS: BusinessSettings = {
   vatRegistered: false,
   validDays: 30,
   paymentTerms: "Payment due within 14 days of invoice.",
-  footerNote: "All work is carried out in compliance with BS 7671 (18th Edition) and Part P of the Building Regulations. A certificate of compliance will be issued on completion.",
+  footerNote: "",
 };
 
 interface SettingsContextValue {

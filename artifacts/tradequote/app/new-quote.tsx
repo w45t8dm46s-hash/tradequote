@@ -26,17 +26,7 @@ import { type Quote, useQuotes } from "@/context/QuotesContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 
-const JOB_TYPES = [
-  { id: "rewire", label: "Rewire", icon: "zap" },
-  { id: "sockets-switches", label: "Sockets & Switches", icon: "square" },
-  { id: "lighting", label: "Lighting", icon: "sun" },
-  { id: "consumer-unit", label: "Consumer Unit", icon: "shield" },
-  { id: "ev-charger", label: "EV Charger", icon: "battery-charging" },
-  { id: "fault-finding", label: "Fault Finding", icon: "search" },
-  { id: "eicr", label: "EICR / Testing", icon: "clipboard" },
-  { id: "smoke-alarms", label: "Smoke Alarms", icon: "bell" },
-  { id: "other", label: "Other Electrical", icon: "tool" },
-];
+import { TRADES, getTradeById } from "@/lib/trades";
 
 type Step = "type" | "details" | "generating" | "preview";
 
@@ -74,6 +64,8 @@ export default function NewQuoteScreen() {
   const [error, setError] = useState("");
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
 
+  const currentTrade = getTradeById(settings.trade) ?? TRADES[0];
+  const JOB_TYPES = currentTrade.jobTypes;
   const selectedType = JOB_TYPES.find((t) => t.id === jobType);
 
   const pickImage = async () => {
@@ -126,6 +118,10 @@ export default function NewQuoteScreen() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
+          trade: currentTrade.id,
+          tradeLabel: currentTrade.label,
+          tradePromptContext: currentTrade.promptContext,
+          tradeTypicalItems: currentTrade.typicalItems,
           jobType: selectedType?.label ?? jobType,
           customerName,
           customerAddress,
@@ -226,7 +222,7 @@ export default function NewQuoteScreen() {
       {step === "type" && (
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
           <Text style={[styles.stepTitle, { color: colors.text }]}>What type of job?</Text>
-          <Text style={[styles.stepSub, { color: colors.mutedForeground }]}>Select the electrical work that best fits this quote</Text>
+          <Text style={[styles.stepSub, { color: colors.mutedForeground }]}>{currentTrade.emoji} {currentTrade.label} — select the work that best fits this quote</Text>
           <View style={styles.typeGrid}>
             {JOB_TYPES.map((t) => {
               const active = jobType === t.id;
