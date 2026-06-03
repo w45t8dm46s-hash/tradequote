@@ -10,22 +10,34 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { useSignUp } from "@clerk/expo";
+import { useSignUp, useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
-
-type Step = "details" | "verify";
+import { getApiBaseUrl } from "../../lib/api";
 
 export default function SignUpScreen() {
-  const { signUp, fetchStatus } = useSignUp();
+  const { signUp, fetchStatus: signUpFetch } = useSignUp();
+  const { signIn } = useSignIn();
   const router = useRouter();
-  const [step, setStep] = useState<Step>("details");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [autoVerifying, setAutoVerifying] = useState(false);
 
   const finalizeSignUp = async () => {
-    await signUp.finalize({
+    await signUp!.finalize({
+      navigate: ({ decorateUrl }) => {
+        const url = decorateUrl("/(tabs)");
+        if (typeof window !== "undefined" && url.startsWith("http")) {
+          window.location.href = url;
+        } else {
+          router.replace(url as Href);
+        }
+      },
+    });
+  };
+
+  const finalizeSignIn = async () => {
+    await signIn!.finalize({
       navigate: ({ decorateUrl }) => {
         const url = decorateUrl("/(tabs)");
         if (typeof window !== "undefined" && url.startsWith("http")) {
@@ -39,34 +51,61 @@ export default function SignUpScreen() {
 
   const onCreate = async () => {
     setError("");
-    const { error: createError } = await signUp.password({
-      emailAddress: email.trim().toLowerCase(),
-      password,
-    });
-    if (createError) {
-      setError(createError.message || "Could not create account. Please try again.");
+
+    try {
+      await signUp!.password({
+        emailAddress: email.trim().toLowerCase(),
+        password,
+      });
+    } catch (err: any) {
+      const msg =
+        err?.errors?.[0]?.longMessage ||
+        err?.errors?.[0]?.message ||
+        err?.message ||
+        "Could not create account. Please try again.";
+      setError(msg);
       return;
     }
 
-    if (signUp.status === "complete") {
+    if (signUp!.status === "complete") {
       await finalizeSignUp();
       return;
     }
 
     const needsEmailVerification =
-      signUp.unverifiedFields?.includes("email_address") ||
-      signUp.status === "missing_requirements";
+      signUp!.unverifiedFields?.includes("email_address") ||
+      signUp!.status === "missing_requirements";
 
     if (needsEmailVerification) {
+      setAutoVerifying(true);
       try {
-        await signUp.verifications.sendEmailCode();
-        setStep("verify");
+        const base = getApiBaseUrl();
+        const r = await fetch(`${base}/api/auth/auto-verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        });
+        if (!r.ok) throw new Error("auto-verify failed");
+
+        await signIn!.create({
+          identifier: email.trim().toLowerCase(),
+          password,
+        });
+
+        if (signIn!.status === "complete") {
+          await finalizeSignIn();
+          return;
+        }
+
+        setError("Account created but sign-in failed. Please sign in manually.");
       } catch (err: any) {
-        const msg =
-          err?.errors?.[0]?.message ||
+        setError(
+          err?.errors?.[0]?.longMessage ||
           err?.message ||
-          "Could not send verification email. Please try again.";
-        setError(msg);
+          "Account created but could not sign in automatically. Please sign in on the next screen."
+        );
+      } finally {
+        setAutoVerifying(false);
       }
       return;
     }
@@ -74,98 +113,8 @@ export default function SignUpScreen() {
     setError("Account creation failed. Please try again.");
   };
 
-  const onVerify = async () => {
-    setError("");
-    try {
-      await signUp.verifications.verifyEmailCode({ code });
-    } catch (err: any) {
-      const msg =
-        err?.errors?.[0]?.longMessage ||
-        err?.errors?.[0]?.message ||
-        err?.message ||
-        "Invalid code. Please try again.";
-      setError(msg);
-      return;
-    }
-
-    if (signUp.status === "complete") {
-      await finalizeSignUp();
-    } else {
-      setError("Verification incomplete. Please try again.");
-    }
-  };
-
-  const onResend = async () => {
-    setError("");
-    try {
-      await signUp.verifications.sendEmailCode();
-    } catch {
-    }
-  };
-
-  const isLoading = fetchStatus === "fetching";
-
-  if (step === "verify") {
-    return (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.flex}
-      >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.brand}>QuoteFlow</Text>
-          <Text style={styles.title}>Check your email</Text>
-          <Text style={styles.subtitle}>
-            We sent a 6-digit code to {email}. Enter it below to activate your account.
-          </Text>
-
-          <Text style={styles.label}>Verification code</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            placeholder="123456"
-            placeholderTextColor="#999"
-            value={code}
-            onChangeText={setCode}
-            maxLength={6}
-            autoFocus
-            returnKeyType="go"
-            onSubmitEditing={code.length === 6 ? onVerify : undefined}
-          />
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <Pressable
-            style={[styles.button, (!code || isLoading) && styles.buttonDisabled]}
-            onPress={onVerify}
-            disabled={!code || isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Verify & continue</Text>
-            )}
-          </Pressable>
-
-          <Pressable style={styles.secondaryButton} onPress={onResend}>
-            <Text style={styles.secondaryText}>Resend code</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => { setStep("details"); setCode(""); setError(""); }}
-            style={styles.linkRow}
-          >
-            <Text style={styles.link}>← Use a different email</Text>
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    );
-  }
-
-  const canSubmit =
-    email.trim().length > 0 && password.length >= 8 && !isLoading;
+  const isLoading = signUpFetch === "fetching" || autoVerifying;
+  const canSubmit = email.trim().length > 0 && password.length >= 8 && !isLoading;
 
   return (
     <KeyboardAvoidingView
@@ -208,6 +157,10 @@ export default function SignUpScreen() {
         />
         {password.length > 0 && password.length < 8 && (
           <Text style={styles.hint}>Password must be at least 8 characters</Text>
+        )}
+
+        {autoVerifying && (
+          <Text style={styles.hint}>Setting up your account…</Text>
         )}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -264,8 +217,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.45 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  secondaryButton: { padding: 14, alignItems: "center", marginTop: 8 },
-  secondaryText: { color: "#FF6B35", fontWeight: "600" },
   linkRow: { flexDirection: "row", justifyContent: "center", marginTop: 20 },
   linkLabel: { color: "#666" },
   link: { color: "#FF6B35", fontWeight: "600" },
