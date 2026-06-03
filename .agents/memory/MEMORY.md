@@ -1,0 +1,1 @@
+- [Clerk Core v3 password reset API](clerk-v3-reset-password.md) — use resetPasswordEmailCode.sendCode/verifyCode/submitPassword sub-namespace, NOT signIn.create() which returns 422
