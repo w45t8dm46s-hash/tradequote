@@ -19,8 +19,10 @@ export default function ForgotPasswordScreen() {
     setInfo("");
     setBusy(true);
     try {
-      await signIn.create({ identifier: email });
-      await signIn.resetPasswordEmailCode();
+      await signIn.create({
+        strategy: "reset_password_email_code",
+        identifier: email,
+      });
       setStage("verify");
       setInfo("We sent a 6-digit code to your email.");
     } catch (e: any) {
