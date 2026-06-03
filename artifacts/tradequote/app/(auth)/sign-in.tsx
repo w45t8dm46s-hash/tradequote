@@ -66,7 +66,7 @@ export default function SignInScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.brand}>QuoteFlow</Text>
+        <Text style={styles.brand}>QuoteForge</Text>
         <Text style={styles.title}>Welcome back</Text>
         <Text style={styles.subtitle}>Sign in to your account</Text>
 
@@ -118,7 +118,7 @@ export default function SignInScreen() {
         </View>
 
         <View style={styles.linkRow}>
-          <Text style={styles.linkLabel}>New to QuoteFlow? </Text>
+          <Text style={styles.linkLabel}>New to QuoteForge? </Text>
           <Link href="/(auth)/sign-up">
             <Text style={styles.link}>Create account</Text>
           </Link>

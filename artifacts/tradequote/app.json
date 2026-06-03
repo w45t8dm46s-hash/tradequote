@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "QuoteFlow",
-    "slug": "quoteflow",
+    "name": "QuoteForge",
+    "slug": "quoteforge",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "quoteflow",
+    "scheme": "quoteforge",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

@@ -40,7 +40,7 @@ export default function TradePicker({ visible, onDismiss }: TradePickerProps) {
         <View style={styles.header}>
           <Text style={styles.title}>What's your trade?</Text>
           <Text style={styles.subtitle}>
-            QuoteFlow tailors job types and AI quotes to your trade.{"\n"}You can change this anytime in Settings.
+            QuoteForge tailors job types and AI quotes to your trade.{"\n"}You can update this anytime in Settings.
           </Text>
         </View>
 

@@ -79,7 +79,7 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: "#FAFAFA" }}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>QuoteFlow</Text>
+        <Text style={styles.brand}>QuoteForge</Text>
         <Text style={styles.title}>Reset password</Text>
         <Text style={styles.subtitle}>
           {stage === "email" ? "Enter your email and we'll send a reset code." : "Enter the code from your email and choose a new password."}

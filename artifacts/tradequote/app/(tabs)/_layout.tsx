@@ -8,12 +8,21 @@ import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import TradePicker from "@/components/TradePicker";
+import { useSettings } from "@/context/SettingsContext";
 
 export default function TabLayout() {
   const { isSignedIn, isLoaded } = useAuth();
   const colors = useColors();
   const colorScheme = useColorScheme();
-  const [showTradePicker, setShowTradePicker] = React.useState(true);
+  const { settings, loading: settingsLoading } = useSettings();
+  const [showTradePicker, setShowTradePicker] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!settingsLoading && !settings.trade) {
+      setShowTradePicker(true);
+    }
+  }, [settingsLoading, settings.trade]);
+
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
   const isDark = colorScheme === "dark";

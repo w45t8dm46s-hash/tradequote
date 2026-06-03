@@ -85,7 +85,7 @@ export default function UpgradeScreen() {
         <Feather name="zap" size={32} color="#FF6B35" />
       </View>
 
-      <Text style={styles.title}>Upgrade to QuoteFlow Pro</Text>
+      <Text style={styles.title}>Upgrade to QuoteForge Pro</Text>
       <Text style={styles.subtitle}>You've used your 5 free quotes. Go unlimited with Pro.</Text>
 
       <View style={styles.card}>

@@ -221,7 +221,7 @@ export default function AccountScreen() {
               style={styles.outlineBtn}
               onPress={() => {
                 if (Platform.OS === "web") {
-                  if (confirm("Sign out of QuoteFlow?")) clerk.signOut();
+                  if (confirm("Sign out of QuoteForge?")) clerk.signOut();
                 } else {
                   clerk.signOut();
                 }

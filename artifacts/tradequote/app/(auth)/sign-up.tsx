@@ -125,7 +125,7 @@ export default function SignUpScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.brand}>QuoteFlow</Text>
+        <Text style={styles.brand}>QuoteForge</Text>
         <Text style={styles.title}>Create your account</Text>
         <Text style={styles.subtitle}>Get 5 free quotes — no card required.</Text>
 

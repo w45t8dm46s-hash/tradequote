@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useUser } from "@clerk/expo";
 import { router } from "expo-router";
 import React from "react";
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -10,6 +11,7 @@ import { useExpenses } from "@/context/ExpensesContext";
 import { useInvoices } from "@/context/InvoicesContext";
 import { useJobs } from "@/context/JobsContext";
 import { useQuotes } from "@/context/QuotesContext";
+import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 
 function StatCard({ label, value, icon, color }: { label: string; value: string; icon: string; color: string }) {
@@ -32,6 +34,8 @@ export default function HomeScreen() {
   const { invoices } = useInvoices();
   const { expenses } = useExpenses();
   const { jobs } = useJobs();
+  const { settings } = useSettings();
+  const { user } = useUser();
 
   const isWeb = Platform.OS === "web";
   const topPadding = isWeb ? 67 : insets.top;
@@ -48,7 +52,9 @@ export default function HomeScreen() {
   const recentQuotes = quotes.slice(0, 3);
 
   const hour = now.getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const timeGreeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const displayName = user?.firstName || settings.businessName || null;
+  const greeting = displayName ? `${timeGreeting}, ${displayName}` : timeGreeting;
 
   const quickActions = [
     { label: "New Quote", icon: "file-plus", route: "/new-quote", color: colors.primary },
@@ -70,7 +76,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{greeting}</Text>
-            <Text style={[styles.appTitle, { color: colors.text }]}>QuoteFlow</Text>
+            <Text style={[styles.appTitle, { color: colors.text }]}>QuoteForge</Text>
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity

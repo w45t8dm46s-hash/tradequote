@@ -36,7 +36,7 @@ function sanitizeColor(c: string | undefined): string {
 
 export function buildQuoteHtml(quote: Quote, settings: BusinessSettings): string {
   const brand = sanitizeColor(settings.brandColor);
-  const businessName = settings.businessName || "QuoteFlow";
+  const businessName = settings.businessName || "QuoteForge";
   const created = formatDate(quote.createdAt);
   const validUntil = addDays(quote.createdAt, quote.validDays);
 
