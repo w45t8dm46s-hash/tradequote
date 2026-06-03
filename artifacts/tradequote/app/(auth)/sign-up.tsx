@@ -21,7 +21,7 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [autoVerifying, setAutoVerifying] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const finalizeSignUp = async () => {
     await signUp!.finalize({
@@ -51,6 +51,7 @@ export default function SignUpScreen() {
 
   const onCreate = async () => {
     setError("");
+    setLoading(true);
 
     try {
       await signUp!.password({
@@ -58,62 +59,65 @@ export default function SignUpScreen() {
         password,
       });
     } catch (err: any) {
-      const msg =
+      setError(
         err?.errors?.[0]?.longMessage ||
         err?.errors?.[0]?.message ||
         err?.message ||
-        "Could not create account. Please try again.";
-      setError(msg);
+        "Could not create account. Please try again."
+      );
+      setLoading(false);
       return;
     }
 
+    // If Clerk already considers sign-up complete, finalize directly
     if (signUp!.status === "complete") {
       await finalizeSignUp();
+      setLoading(false);
       return;
     }
 
-    const needsEmailVerification =
+    // Email verification is required — use a server-issued sign-in token to
+    // bypass ALL multi-factor requirements (email OTP, TOTP, etc.)
+    const needsVerification =
       signUp!.unverifiedFields?.includes("email_address") ||
       signUp!.status === "missing_requirements";
 
-    if (needsEmailVerification) {
-      setAutoVerifying(true);
+    if (needsVerification) {
       try {
         const base = getApiBaseUrl();
-        const r = await fetch(`${base}/api/auth/auto-verify`, {
+        const r = await fetch(`${base}/api/auth/sign-in-token`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: email.trim().toLowerCase() }),
         });
-        if (!r.ok) throw new Error("auto-verify failed");
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error || "Could not activate account");
 
-        await signIn!.create({
-          identifier: email.trim().toLowerCase(),
-          password,
-        });
+        // strategy: "ticket" bypasses email verification AND MFA
+        await signIn!.create({ strategy: "ticket", ticket: body.token });
 
         if (signIn!.status === "complete") {
           await finalizeSignIn();
           return;
         }
-
-        setError("Account created but sign-in failed. Please sign in manually.");
+        setError("Account created but sign-in failed. Please sign in on the next screen.");
       } catch (err: any) {
         setError(
           err?.errors?.[0]?.longMessage ||
           err?.message ||
-          "Account created but could not sign in automatically. Please sign in on the next screen."
+          "Account created. Please sign in to continue."
         );
       } finally {
-        setAutoVerifying(false);
+        setLoading(false);
       }
       return;
     }
 
     setError("Account creation failed. Please try again.");
+    setLoading(false);
   };
 
-  const isLoading = signUpFetch === "fetching" || autoVerifying;
+  const isLoading = signUpFetch === "fetching" || loading;
   const canSubmit = email.trim().length > 0 && password.length >= 8 && !isLoading;
 
   return (
@@ -159,7 +163,7 @@ export default function SignUpScreen() {
           <Text style={styles.hint}>Password must be at least 8 characters</Text>
         )}
 
-        {autoVerifying && (
+        {isLoading && (
           <Text style={styles.hint}>Setting up your account…</Text>
         )}
 
