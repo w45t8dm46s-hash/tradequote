@@ -15,6 +15,11 @@ import { Link, useRouter, type Href } from "expo-router";
 
 type Stage = "form" | "verify";
 
+function clerkMsg(error: { longMessage?: string | null; message?: string | null } | null | undefined, fallback: string): string {
+  if (!error) return fallback;
+  return error.longMessage || error.message || fallback;
+}
+
 export default function SignUpScreen() {
   const { signUp, fetchStatus } = useSignUp();
   const router = useRouter();
@@ -26,53 +31,57 @@ export default function SignUpScreen() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const finalize = async () => {
-    await signUp!.finalize({
-      navigate: ({ decorateUrl }: { decorateUrl: (path: string) => string }) => {
-        const url = decorateUrl("/(tabs)");
-        if (typeof window !== "undefined" && url.startsWith("http")) {
-          window.location.href = url;
-        } else {
-          router.replace(url as Href);
-        }
-      },
-    });
+  const doFinalize = async (): Promise<boolean> => {
+    const { error: finalErr } = await signUp!.finalize();
+    if (finalErr) {
+      setError(clerkMsg(finalErr, "Account created but sign-in failed. Please sign in."));
+      return false;
+    }
+    router.replace("/(tabs)" as Href);
+    return true;
   };
 
-  // Stage 1 — create the Clerk account
+  // Stage 1 — create the Clerk account with email + password
   const onCreate = async () => {
     if (!signUp) return;
     setError("");
     setBusy(true);
     try {
-      await signUp.create({
+      // SignUpFutureResource.password() is the correct method for email+password sign-up
+      const { error: pwErr } = await signUp.password({
         emailAddress: email.trim().toLowerCase(),
         password,
       });
 
-      if (signUp.status === "complete") {
-        await finalize();
+      if (pwErr) {
+        const code = (pwErr as any).code ?? "";
+        if (code === "form_identifier_exists") {
+          setError("An account with this email already exists. Please sign in or reset your password.");
+        } else {
+          setError(clerkMsg(pwErr, "Could not create account. Please try again."));
+        }
         return;
       }
 
-      // Email verification required — send the code
-      if (
-        signUp.unverifiedFields?.includes("email_address") ||
-        signUp.status === "missing_requirements"
-      ) {
-        await (signUp as any).prepareEmailAddressVerification({ strategy: "email_code" });
+      if (signUp.status === "complete") {
+        await doFinalize();
+        return;
+      }
+
+      // Email verification required — send the code via the verified API
+      if (signUp.unverifiedFields.includes("email_address")) {
+        const { error: sendErr } = await signUp.verifications.sendEmailCode();
+        if (sendErr) {
+          setError(clerkMsg(sendErr, "Could not send verification code. Please try again."));
+          return;
+        }
         setStage("verify");
         return;
       }
 
       setError("Account creation failed. Please try again.");
     } catch (e: any) {
-      setError(
-        e?.errors?.[0]?.longMessage ||
-        e?.errors?.[0]?.message ||
-        e?.message ||
-        "Could not create account. Please try again."
-      );
+      setError(e?.message || "An unexpected error occurred. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -84,21 +93,24 @@ export default function SignUpScreen() {
     setError("");
     setBusy(true);
     try {
-      const result = await (signUp as any).attemptEmailAddressVerification({ code: code.trim() });
+      // SignUpFutureVerifications.verifyEmailCode() is the correct method
+      const { error: verifyErr } = await signUp.verifications.verifyEmailCode({
+        code: code.trim(),
+      });
 
-      if (result.status === "complete") {
-        await finalize();
+      if (verifyErr) {
+        setError(clerkMsg(verifyErr, "Invalid or expired code. Please try again."));
         return;
       }
 
-      setError("Verification failed. Please check the code and try again.");
+      if (signUp.status === "complete") {
+        await doFinalize();
+        return;
+      }
+
+      setError("Verification passed but sign-up incomplete. Please try again.");
     } catch (e: any) {
-      setError(
-        e?.errors?.[0]?.longMessage ||
-        e?.errors?.[0]?.message ||
-        e?.message ||
-        "Invalid or expired code. Please try again."
-      );
+      setError(e?.message || "An unexpected error occurred. Please try again.");
     } finally {
       setBusy(false);
     }

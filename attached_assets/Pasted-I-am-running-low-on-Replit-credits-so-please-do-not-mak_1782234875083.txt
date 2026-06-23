@@ -1,0 +1,64 @@
+I am running low on Replit credits, so please do not make another narrow patch that creates a new Clerk error. Fix the QuoteForge authentication flow completely and defensively.
+
+Current production error on sign-up:
+
+e.prepareEmailAddressVerification is not a function
+
+This means the app is calling a Clerk method that does not exist for the installed Clerk SDK/version.
+
+Please do the following:
+
+1. Inspect the installed Clerk packages and versions in package.json / pnpm-lock.yaml. Do not guess Clerk method names.
+
+2. Fix the sign-up flow in artifacts/tradequote/app/(auth)/sign-up.tsx using the correct Clerk API for the installed SDK version.
+
+The required working flow is:
+
+* User enters email and password.
+* Create the Clerk sign-up using the correct email/password method for the installed SDK.
+* If email verification is required, send the email verification code using the correct SDK method.
+* Show a verification-code input step.
+* Verify the code using the correct SDK method.
+* Finalize/activate the Clerk session.
+* Only after Clerk sign-up is complete, sync/create the user record in the backend/database.
+
+3. Do not call /api/auth/sign-in-token or any backend “user lookup” endpoint before the Clerk user exists. That caused the previous “user not found” error.
+
+4. Ensure all frontend API calls use the configured API base URL:
+   https://quoteforge-api-9fzw.onrender.com
+
+Do not use relative /api/... calls against:
+https://quoteforge-webapp.onrender.com
+
+5. Preserve and confirm these environment-variable names are supported:
+   EXPO_PUBLIC_API_URL
+   VITE_API_URL
+
+6. Add safe fetch handling. If the backend returns HTML, 404, 500, or non-JSON, show a clear app error rather than crashing with:
+   Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+7. Handle likely Clerk outcomes:
+
+* Email already exists: show “An account already exists. Please sign in or reset your password.”
+* Weak password: show Clerk’s password error.
+* Verification required: show code input.
+* Wrong verification code: show a clear error.
+* Clerk not loaded yet: disable the button until ready.
+* Missing captcha requirement: include the required Clerk captcha element for web sign-up.
+* User already signed in: redirect to dashboard.
+
+8. Fix forgot-password only if it can be done using the same confirmed Clerk SDK API. If uncertain, temporarily hide/disable forgot password with a clear message rather than breaking sign-up again.
+
+9. If the custom Clerk flow continues to be unstable, replace the custom sign-up/sign-in/forgot-password screens with Clerk’s standard/prebuilt authentication flow for now. Working authentication is more important than the custom UI.
+
+10. Do not change Stripe, domain settings, pricing, AI quote generation, database, or Render environment variables during this task.
+
+11. Before finishing, run typecheck/build. Confirm:
+
+* no TypeScript errors
+* sign-up compiles
+* no usage of prepareEmailAddressVerification remains unless the installed Clerk SDK definitely supports it
+* no sign-up code calls /api/auth/sign-in-token before a user exists
+
+12. Commit the result with the message:
+    Fix Clerk sign-up flow using supported SDK methods

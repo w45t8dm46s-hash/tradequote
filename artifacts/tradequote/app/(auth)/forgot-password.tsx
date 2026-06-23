@@ -12,9 +12,13 @@ import {
 } from "react-native";
 import { useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
-import { getApiBaseUrl, parseJsonResponse } from "../../lib/api";
 
 type Stage = "email" | "code" | "password";
+
+function clerkMsg(error: { longMessage?: string | null; message?: string | null } | null | undefined, fallback: string): string {
+  if (!error) return fallback;
+  return error.longMessage || error.message || fallback;
+}
 
 export default function ForgotPasswordScreen() {
   const { signIn } = useSignIn();
@@ -28,127 +32,93 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
-  const finalize = async () => {
-    await (signIn as any).finalize({
-      navigate: ({ decorateUrl }: { decorateUrl: (path: string) => string }) => {
-        const url = decorateUrl("/(tabs)");
-        if (typeof window !== "undefined" && url.startsWith("http")) {
-          window.location.href = url;
-        } else {
-          router.replace(url as Href);
-        }
-      },
-    });
-  };
-
-  const signInWithTicket = async () => {
-    const base = getApiBaseUrl();
-    const r = await fetch(`${base}/api/auth/sign-in-token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim().toLowerCase() }),
-    });
-    const body = await parseJsonResponse<{ token?: string; error?: string }>(r);
-    if (!r.ok) throw new Error(body.error || "Could not get sign-in token");
-    await (signIn as any).create({ strategy: "ticket", ticket: body.token });
-    if (signIn!.status === "complete") {
-      await finalize();
-    } else {
-      throw new Error("Sign-in failed after ticket");
-    }
-  };
-
-  // Stage 1 — request a reset code via email
+  // Stage 1 — identify the user and send the reset code
+  // Uses SignInFutureResource.create({ identifier }) then resetPasswordEmailCode.sendCode()
   const sendCode = async () => {
     if (!signIn) return;
     setError("");
     setInfo("");
     setBusy(true);
     try {
-      await (signIn as any).create({
-        strategy: "reset_password_email_code",
-        identifier: email.trim().toLowerCase(),
-      });
+      const { error: createErr } = await signIn.create({ identifier: email.trim().toLowerCase() });
+
+      if (createErr) {
+        const errCode = (createErr as any).code ?? "";
+        // Don't reveal whether the email is registered
+        if (errCode === "form_identifier_not_found" || errCode.includes("not_found")) {
+          setInfo("If an account exists for this email, a reset code will be sent.");
+          setStage("code");
+          return;
+        }
+        setError(clerkMsg(createErr, "Could not send reset code. Check the email address and try again."));
+        return;
+      }
+
+      // Send the reset code using the typed resetPasswordEmailCode namespace
+      const { error: sendErr } = await signIn.resetPasswordEmailCode.sendCode();
+      if (sendErr) {
+        setError(clerkMsg(sendErr, "Could not send reset code. Please try again."));
+        return;
+      }
+
       setInfo(`A 6-digit reset code has been sent to ${email.trim()}.`);
       setStage("code");
     } catch (e: any) {
-      const clerkCode: string = e?.errors?.[0]?.code ?? "";
-      // Don't reveal whether the email is registered
-      if (
-        clerkCode === "form_identifier_not_found" ||
-        clerkCode === "form_identifier_not_found_for_strategy" ||
-        clerkCode.includes("not_found")
-      ) {
-        setInfo("If an account exists for this email, a reset code will be sent.");
-        setStage("code");
-      } else {
-        setError(
-          e?.errors?.[0]?.longMessage ||
-          e?.errors?.[0]?.message ||
-          e?.message ||
-          "Could not send reset code. Check the email address and try again."
-        );
-      }
+      setError(e?.message || "An unexpected error occurred. Please try again.");
     } finally {
       setBusy(false);
     }
   };
 
-  // Stage 2 — verify the emailed code; Clerk transitions to needs_new_password
+  // Stage 2 — verify the emailed code (status becomes needs_new_password)
+  // Uses SignInFutureResource.resetPasswordEmailCode.verifyCode()
   const verifyCode = async () => {
     if (!signIn) return;
     setError("");
     setBusy(true);
     try {
-      const result = await (signIn as any).attemptFirstFactor({
-        strategy: "reset_password_email_code",
+      const { error: verifyErr } = await signIn.resetPasswordEmailCode.verifyCode({
         code: code.trim(),
       });
-      if (result.status === "needs_new_password") {
-        setStage("password");
-      } else if (result.status === "complete") {
-        await finalize();
-      } else {
-        setError("Unexpected state after code verification. Please try again.");
+
+      if (verifyErr) {
+        setError(clerkMsg(verifyErr, "Invalid or expired code. Please try again."));
+        return;
       }
+
+      setStage("password");
     } catch (e: any) {
-      setError(
-        e?.errors?.[0]?.longMessage ||
-        e?.errors?.[0]?.message ||
-        e?.message ||
-        "Invalid or expired code. Please try again."
-      );
+      setError(e?.message || "An unexpected error occurred. Please try again.");
     } finally {
       setBusy(false);
     }
   };
 
-  // Stage 3 — set the new password; Clerk completes the sign-in
+  // Stage 3 — set the new password (status becomes complete) then finalize
+  // Uses SignInFutureResource.resetPasswordEmailCode.submitPassword()
   const submitPassword = async () => {
     if (!signIn) return;
     setError("");
     setBusy(true);
     try {
-      const result = await (signIn as any).resetPassword({
+      const { error: submitErr } = await signIn.resetPasswordEmailCode.submitPassword({
         password: newPassword,
         signOutOfOtherSessions: true,
       });
-      if (result.status === "complete") {
-        await finalize();
+
+      if (submitErr) {
+        setError(clerkMsg(submitErr, "Could not set new password. Please try again."));
         return;
       }
-      if (result.status === "needs_second_factor") {
-        await signInWithTicket();
+
+      const { error: finalErr } = await signIn.finalize();
+      if (finalErr) {
+        setError(clerkMsg(finalErr, "Password reset. Please sign in manually."));
         return;
       }
-      setError("Password reset, but sign-in failed. Please sign in manually.");
+      router.replace("/(tabs)" as Href);
     } catch (e: any) {
-      setError(
-        e?.errors?.[0]?.longMessage ||
-        e?.errors?.[0]?.message ||
-        e?.message ||
-        "Could not set new password. Please try again."
-      );
+      setError(e?.message || "An unexpected error occurred. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -180,7 +150,7 @@ export default function ForgotPasswordScreen() {
           {stage === "password" && "Choose a new password for your account."}
         </Text>
 
-        {/* ── Stage 1: email ── */}
+        {/* Stage 1: email */}
         {stage === "email" && (
           <>
             <Text style={styles.label}>Email</Text>
@@ -208,11 +178,10 @@ export default function ForgotPasswordScreen() {
           </>
         )}
 
-        {/* ── Stage 2: code ── */}
+        {/* Stage 2: code */}
         {stage === "code" && (
           <>
             {info ? <Text style={styles.infoText}>{info}</Text> : null}
-
             <Text style={styles.label}>6-digit code</Text>
             <TextInput
               style={styles.input}
@@ -225,6 +194,7 @@ export default function ForgotPasswordScreen() {
               maxLength={6}
               returnKeyType="go"
               onSubmitEditing={canVerify ? verifyCode : undefined}
+              autoFocus
             />
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Pressable
@@ -240,7 +210,7 @@ export default function ForgotPasswordScreen() {
           </>
         )}
 
-        {/* ── Stage 3: new password ── */}
+        {/* Stage 3: new password */}
         {stage === "password" && (
           <>
             <Text style={styles.label}>New password</Text>
@@ -254,6 +224,7 @@ export default function ForgotPasswordScreen() {
               onChangeText={setNewPassword}
               returnKeyType="go"
               onSubmitEditing={canSubmit ? submitPassword : undefined}
+              autoFocus
             />
             {newPassword.length > 0 && newPassword.length < 8 && (
               <Text style={styles.hint}>Password must be at least 8 characters</Text>
