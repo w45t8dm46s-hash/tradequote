@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
-import { getApiBaseUrl } from "../../lib/api";
+import { getApiBaseUrl, parseJsonResponse } from "../../lib/api";
 
 type Stage = "email" | "code" | "password";
 
@@ -48,7 +48,7 @@ export default function ForgotPasswordScreen() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email.trim().toLowerCase() }),
     });
-    const body = await r.json();
+    const body = await parseJsonResponse<{ token?: string; error?: string }>(r);
     if (!r.ok) throw new Error(body.error || "Could not get sign-in token");
     await (signIn as any).create({ strategy: "ticket", ticket: body.token });
     if (signIn!.status === "complete") {

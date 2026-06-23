@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSignUp, useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
-import { getApiBaseUrl } from "../../lib/api";
+import { getApiBaseUrl, parseJsonResponse } from "../../lib/api";
 
 export default function SignUpScreen() {
   const { signUp, fetchStatus: signUpFetch } = useSignUp();
@@ -90,7 +90,7 @@ export default function SignUpScreen() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: email.trim().toLowerCase() }),
         });
-        const body = await r.json();
+        const body = await parseJsonResponse<{ token?: string; error?: string }>(r);
         if (!r.ok) throw new Error(body.error || "Could not activate account");
 
         // strategy: "ticket" bypasses email verification AND MFA
