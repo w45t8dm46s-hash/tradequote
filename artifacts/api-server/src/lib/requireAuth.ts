@@ -45,7 +45,7 @@ export async function getActiveProPriceIds(): Promise<string[]> {
 
 export async function hasActiveSubscription(stripeCustomerId: string | null): Promise<boolean> {
   if (!stripeCustomerId) return false;
-  // Tie entitlement strictly to a subscription on an active QuoteFlow price.
+  // Tie entitlement strictly to a subscription on an active QuoteForge price.
   const result = await db.execute(sql`
     SELECT 1
     FROM stripe.subscriptions s

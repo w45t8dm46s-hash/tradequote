@@ -89,12 +89,14 @@ export default function SignInScreen() {
           // prepareFirstFactor not needed for this strategy variant — ignore
         }
 
-        if (signIn!.status === "complete") {
+        // Read status as plain string to avoid TypeScript narrowing from outer if
+        const statusAfterAttempt: string = signIn!.status;
+        if (statusAfterAttempt === "complete") {
           await finalize();
           return;
         }
 
-        if (signIn!.status === "needs_second_factor") {
+        if (statusAfterAttempt === "needs_second_factor") {
           // Password was verified via the two-step flow — bypass MFA with ticket
           await signInWithTicket();
           return;

@@ -6,7 +6,7 @@ import { getUncachableStripeClient } from "../lib/stripeClient";
 
 const router = Router();
 
-// Return the QuoteFlow Pro price (the single subscription product).
+// Return the QuoteForge Pro price (the single subscription product).
 router.get("/stripe/price", async (_req, res) => {
   try {
     const result = await db.execute(sql`
@@ -41,7 +41,7 @@ router.post("/stripe/checkout", requireAuth, async (req, res) => {
     const { priceId, returnUrl } = req.body as { priceId?: string; returnUrl?: string };
     if (!priceId) return res.status(400).json({ error: "priceId required" });
 
-    // Server-side allowlist: only accept currently-active QuoteFlow prices.
+    // Server-side allowlist: only accept currently-active QuoteForge prices.
     const allowed = await getActiveProPriceIds();
     if (!allowed.includes(priceId)) {
       return res.status(400).json({ error: "Invalid priceId" });

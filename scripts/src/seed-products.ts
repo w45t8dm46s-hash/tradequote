@@ -1,6 +1,6 @@
 import { getUncachableStripeClient } from "./stripeClient";
 
-const PRODUCT_NAME = "QuoteFlow Pro";
+const PRODUCT_NAME = "QuoteForge Pro";
 const PRICE_PENCE = 1499; // £14.99
 const CURRENCY = "gbp";
 
