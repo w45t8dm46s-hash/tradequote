@@ -61,6 +61,16 @@ app.post(
 // Restrict CORS to trusted origins only. In dev we allow the Replit dev/expo
 // domains; in production we allow the deployed REPLIT_DOMAINS.
 const allowedOrigins = new Set<string>();
+// Explicit list for Render / custom deployments (comma-separated URLs or hostnames)
+for (const entry of (process.env.ALLOWED_ORIGINS?.split(",") ?? [])) {
+  const trimmed = entry.trim();
+  if (!trimmed) continue;
+  allowedOrigins.add(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+}
+// APP_DOMAIN / RENDER_EXTERNAL_URL for Render deployments
+if (process.env.APP_DOMAIN) allowedOrigins.add(`https://${process.env.APP_DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "")}`);
+if (process.env.RENDER_EXTERNAL_URL) allowedOrigins.add(process.env.RENDER_EXTERNAL_URL.replace(/\/$/, ""));
+// Replit fallbacks (no-op on Render where these vars are absent)
 for (const d of (process.env.REPLIT_DOMAINS?.split(",") ?? [])) {
   if (d) allowedOrigins.add(`https://${d.trim()}`);
 }

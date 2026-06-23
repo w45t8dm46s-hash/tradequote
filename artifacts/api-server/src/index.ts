@@ -22,7 +22,13 @@ async function initStripe() {
 
     const stripeSync = await getStripeSync();
 
-    const domain = process.env.REPLIT_DOMAINS?.split(",")[0] || process.env.REPLIT_DEV_DOMAIN;
+    // Prefer explicit APP_DOMAIN (Render), then RENDER_EXTERNAL_URL, then Replit fallbacks
+    const rawDomain =
+      process.env.APP_DOMAIN ||
+      process.env.RENDER_EXTERNAL_URL?.replace(/^https?:\/\//, "") ||
+      process.env.REPLIT_DOMAINS?.split(",")[0] ||
+      process.env.REPLIT_DEV_DOMAIN;
+    const domain = rawDomain?.replace(/\/$/, "");
     if (domain) {
       const webhookUrl = `https://${domain}/api/stripe/webhook`;
       try {
