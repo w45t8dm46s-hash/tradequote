@@ -14,20 +14,23 @@ import { useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
 import { getApiBaseUrl } from "../../lib/api";
 
+type Stage = "email" | "code" | "password";
+
 export default function ForgotPasswordScreen() {
   const { signIn } = useSignIn();
   const router = useRouter();
 
-  const [stage, setStage] = useState<"email" | "verify">("email");
+  const [stage, setStage] = useState<Stage>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   const finalize = async () => {
-    await signIn!.finalize({
-      navigate: ({ decorateUrl }) => {
+    await (signIn as any).finalize({
+      navigate: ({ decorateUrl }: { decorateUrl: (path: string) => string }) => {
         const url = decorateUrl("/(tabs)");
         if (typeof window !== "undefined" && url.startsWith("http")) {
           window.location.href = url;
@@ -47,7 +50,7 @@ export default function ForgotPasswordScreen() {
     });
     const body = await r.json();
     if (!r.ok) throw new Error(body.error || "Could not get sign-in token");
-    await signIn!.create({ strategy: "ticket", ticket: body.token });
+    await (signIn as any).create({ strategy: "ticket", ticket: body.token });
     if (signIn!.status === "complete") {
       await finalize();
     } else {
@@ -55,68 +58,113 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  // Step 1 — send the reset code to the user's email
+  // Stage 1 — request a reset code via email
   const sendCode = async () => {
+    if (!signIn) return;
     setError("");
+    setInfo("");
     setBusy(true);
     try {
-      // Cast: SignInFutureResource types omit reset_password_email_code strategy,
-      // but the Clerk runtime object supports it.
       await (signIn as any).create({
         strategy: "reset_password_email_code",
         identifier: email.trim().toLowerCase(),
       });
-      setStage("verify");
+      setInfo(`A 6-digit reset code has been sent to ${email.trim()}.`);
+      setStage("code");
+    } catch (e: any) {
+      const clerkCode: string = e?.errors?.[0]?.code ?? "";
+      // Don't reveal whether the email is registered
+      if (
+        clerkCode === "form_identifier_not_found" ||
+        clerkCode === "form_identifier_not_found_for_strategy" ||
+        clerkCode.includes("not_found")
+      ) {
+        setInfo("If an account exists for this email, a reset code will be sent.");
+        setStage("code");
+      } else {
+        setError(
+          e?.errors?.[0]?.longMessage ||
+          e?.errors?.[0]?.message ||
+          e?.message ||
+          "Could not send reset code. Check the email address and try again."
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Stage 2 — verify the emailed code; Clerk transitions to needs_new_password
+  const verifyCode = async () => {
+    if (!signIn) return;
+    setError("");
+    setBusy(true);
+    try {
+      const result = await (signIn as any).attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code: code.trim(),
+      });
+      if (result.status === "needs_new_password") {
+        setStage("password");
+      } else if (result.status === "complete") {
+        await finalize();
+      } else {
+        setError("Unexpected state after code verification. Please try again.");
+      }
     } catch (e: any) {
       setError(
         e?.errors?.[0]?.longMessage ||
         e?.errors?.[0]?.message ||
         e?.message ||
-        "Could not send reset code. Check the email address and try again."
+        "Invalid or expired code. Please try again."
       );
     } finally {
       setBusy(false);
     }
   };
 
-  // Step 2 — verify the code and set the new password in a single call
-  const submitReset = async () => {
+  // Stage 3 — set the new password; Clerk completes the sign-in
+  const submitPassword = async () => {
+    if (!signIn) return;
     setError("");
     setBusy(true);
     try {
-      await (signIn as any).attemptFirstFactor({
-        strategy: "reset_password_email_code",
-        code,
+      const result = await (signIn as any).resetPassword({
         password: newPassword,
+        signOutOfOtherSessions: true,
       });
-
-      if (signIn!.status === "complete") {
+      if (result.status === "complete") {
         await finalize();
         return;
       }
-
-      // MFA required even after reset — bypass with server ticket
-      const statusAfter: string = signIn!.status;
-      if (statusAfter === "needs_second_factor") {
+      if (result.status === "needs_second_factor") {
         await signInWithTicket();
         return;
       }
-
       setError("Password reset, but sign-in failed. Please sign in manually.");
     } catch (e: any) {
       setError(
         e?.errors?.[0]?.longMessage ||
         e?.errors?.[0]?.message ||
         e?.message ||
-        "Invalid code or password. Please try again."
+        "Could not set new password. Please try again."
       );
     } finally {
       setBusy(false);
     }
   };
 
+  const restart = () => {
+    setStage("email");
+    setCode("");
+    setNewPassword("");
+    setError("");
+    setInfo("");
+  };
+
   const canSend = email.trim().length > 0 && !busy;
-  const canReset = code.trim().length > 0 && newPassword.length >= 8 && !busy;
+  const canVerify = code.trim().length === 6 && !busy;
+  const canSubmit = newPassword.length >= 8 && !busy;
 
   return (
     <KeyboardAvoidingView
@@ -127,12 +175,13 @@ export default function ForgotPasswordScreen() {
         <Text style={styles.brand}>QuoteForge</Text>
         <Text style={styles.title}>Reset password</Text>
         <Text style={styles.subtitle}>
-          {stage === "email"
-            ? "Enter your email and we'll send a 6-digit reset code."
-            : "Enter the code from your email and choose a new password."}
+          {stage === "email" && "Enter your email and we'll send a 6-digit reset code."}
+          {stage === "code" && "Enter the 6-digit code from your email."}
+          {stage === "password" && "Choose a new password for your account."}
         </Text>
 
-        {stage === "email" ? (
+        {/* ── Stage 1: email ── */}
+        {stage === "email" && (
           <>
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -154,16 +203,15 @@ export default function ForgotPasswordScreen() {
               onPress={sendCode}
               disabled={!canSend}
             >
-              {busy ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Send reset code</Text>
-              )}
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Send reset code</Text>}
             </Pressable>
           </>
-        ) : (
+        )}
+
+        {/* ── Stage 2: code ── */}
+        {stage === "code" && (
           <>
-            <Text style={styles.info}>We sent a 6-digit code to {email}</Text>
+            {info ? <Text style={styles.infoText}>{info}</Text> : null}
 
             <Text style={styles.label}>6-digit code</Text>
             <TextInput
@@ -175,8 +223,26 @@ export default function ForgotPasswordScreen() {
               value={code}
               onChangeText={setCode}
               maxLength={6}
+              returnKeyType="go"
+              onSubmitEditing={canVerify ? verifyCode : undefined}
             />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Pressable
+              style={[styles.button, !canVerify && styles.buttonDisabled]}
+              onPress={verifyCode}
+              disabled={!canVerify}
+            >
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Verify code</Text>}
+            </Pressable>
+            <Pressable onPress={restart}>
+              <Text style={[styles.link, styles.centred]}>Use a different email</Text>
+            </Pressable>
+          </>
+        )}
 
+        {/* ── Stage 3: new password ── */}
+        {stage === "password" && (
+          <>
             <Text style={styles.label}>New password</Text>
             <TextInput
               style={styles.input}
@@ -187,35 +253,18 @@ export default function ForgotPasswordScreen() {
               value={newPassword}
               onChangeText={setNewPassword}
               returnKeyType="go"
-              onSubmitEditing={canReset ? submitReset : undefined}
+              onSubmitEditing={canSubmit ? submitPassword : undefined}
             />
             {newPassword.length > 0 && newPassword.length < 8 && (
               <Text style={styles.hint}>Password must be at least 8 characters</Text>
             )}
-
             {error ? <Text style={styles.error}>{error}</Text> : null}
-
             <Pressable
-              style={[styles.button, !canReset && styles.buttonDisabled]}
-              onPress={submitReset}
-              disabled={!canReset}
+              style={[styles.button, !canSubmit && styles.buttonDisabled]}
+              onPress={submitPassword}
+              disabled={!canSubmit}
             >
-              {busy ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Reset password</Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                setStage("email");
-                setCode("");
-                setNewPassword("");
-                setError("");
-              }}
-            >
-              <Text style={[styles.link, styles.centred]}>Use a different email</Text>
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Set new password</Text>}
             </Pressable>
           </>
         )}
@@ -248,7 +297,7 @@ const styles = StyleSheet.create({
   },
   hint: { color: "#888", fontSize: 12, marginTop: 4 },
   error: { color: "#D32F2F", fontSize: 13, marginTop: 8, lineHeight: 18 },
-  info: { color: "#15803D", fontSize: 13, marginTop: 4, marginBottom: 4 },
+  infoText: { color: "#15803D", fontSize: 13, marginTop: 4, marginBottom: 4, lineHeight: 18 },
   button: {
     backgroundColor: "#FF6B35",
     padding: 16,
