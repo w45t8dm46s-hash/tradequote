@@ -330,7 +330,7 @@ export default function NewQuoteScreen() {
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Measurements / Quantities</Text>
             <TextInput
               style={[styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-              placeholder="e.g. 8 double sockets, 12m cable run, 3 light fittings..."
+              placeholder={currentTrade.measurementsPlaceholder}
               placeholderTextColor={colors.mutedForeground}
               value={measurements}
               onChangeText={setMeasurements}
