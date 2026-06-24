@@ -188,6 +188,57 @@ export default function NewQuoteScreen() {
     }
   };
 
+
+  const createManualQuote = async () => {
+    if (!customerName.trim() || !description.trim()) {
+      setError("Please enter at least a customer name and job description.");
+      return;
+    }
+
+    const subtotal = 0;
+    const taxRate = 20;
+    const taxAmount = 0;
+    const total = subtotal + taxAmount;
+
+    const quote: Quote = {
+      id: generateId(),
+      jobType,
+      jobTypeLabel: selectedType?.label ?? jobType,
+      customerName: customerName.trim(),
+      customerAddress: customerAddress.trim(),
+      customerId: customerId || undefined,
+      description: description.trim(),
+      measurements: measurements.trim(),
+      notes: notes.trim() || "Manual quote created without AI. Add pricing details before sending.",
+      photos: photos.map((p) => p.uri),
+      status: "draft",
+      createdAt: new Date().toISOString(),
+      lineItems: [
+        {
+          id: generateId(),
+          description: description.trim() || "Manual quote item",
+          quantity: 1,
+          unit: "item",
+          rate: 0,
+          total: 0,
+        },
+      ],
+      subtotal,
+      taxRate,
+      taxAmount,
+      total,
+      professionalSummary: `Manual quote for ${selectedType?.label ?? jobType}. Review and edit pricing before sending to the customer.`,
+      customerSummary: "Thank you for your enquiry. Please review the quote details below.",
+      validDays: 30,
+      quoteNumber: generateQuoteNumber(),
+    };
+
+    setError("");
+    setGeneratedQuote(quote);
+    setStep("preview");
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  };
+
   const saveQuote = async () => {
     if (!generatedQuote) return;
     try {
@@ -393,6 +444,15 @@ export default function NewQuoteScreen() {
             <Feather name="cpu" size={18} color="#fff" />
             <Text style={[styles.primaryBtnText, { color: "#fff" }]}>Generate Quote with AI</Text>
           </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.outlineBtn, { borderColor: colors.border, marginTop: 12 }]}
+                onPress={createManualQuote}
+                activeOpacity={0.85}
+              >
+                <Feather name="edit-3" size={18} color={colors.text} />
+                <Text style={[styles.outlineBtnText, { color: colors.text }]}>Create Basic Quote Manually</Text>
+              </TouchableOpacity>
+
         </KeyboardAwareScrollView>
       )}
 
