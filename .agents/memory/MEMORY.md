@@ -1,2 +1,3 @@
+- [Clerk Expo v3 Future API](clerk-expo-v3-future-api.md) — SignUpFutureResource/SignInFutureResource correct methods; finalize() without navigate, verifications.sendEmailCode() not .emailAddress.sendEmailCode()
 - [Clerk Core v3 password reset API](clerk-v3-reset-password.md) — use resetPasswordEmailCode.sendCode/verifyCode/submitPassword sub-namespace, NOT signIn.create() which returns 422
 - [Clerk v3 Sign-In Flow](clerk-v3-sign-in.md) — use `signIn.create({identifier,password})` + try/catch; never `signIn.password({emailAddress,...})`; clerk-js throws on failure, doesn't return `{error}`
