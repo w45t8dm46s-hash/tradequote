@@ -4,7 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { SymbolView } from "expo-symbols";
 import { useAuth } from "@clerk/expo";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, Pressable, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import TradePicker from "@/components/TradePicker";
@@ -71,6 +71,28 @@ export default function TabLayout() {
             ) : (
               <Feather name="home" size={22} color={color} />
             ),
+        }}
+      />
+      <Tabs.Screen
+        name="trade"
+        options={{
+          title: "Trade",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="wrench.and.screwdriver" tintColor={color} size={24} />
+            ) : (
+              <Feather name="tool" size={22} color={color} />
+            ),
+          tabBarButton: (props: any) => (
+            <Pressable
+              style={props.style}
+              onPress={() => setShowTradePicker(true)}
+              accessibilityRole="button"
+              accessibilityState={props.accessibilityState}
+            >
+              {props.children}
+            </Pressable>
+          ),
         }}
       />
       <Tabs.Screen

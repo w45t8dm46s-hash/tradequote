@@ -53,8 +53,9 @@ export default function HomeScreen() {
 
   const hour = now.getHours();
   const timeGreeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const displayName = user?.firstName || settings.businessName || null;
-  const greeting = displayName ? `${timeGreeting}, ${displayName}` : timeGreeting;
+  const firstName = user?.firstName || null;
+  const greeting = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
+  const companyHeading = settings.businessName || settings.tradingAs || "Your Business";
 
   const quickActions = [
     { label: "New Quote", icon: "file-plus", route: "/new-quote", color: colors.primary },
@@ -75,8 +76,9 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <View>
+            <Text style={[styles.brandMark, { color: colors.primary }]}>QuoteForge</Text>
             <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{greeting}</Text>
-            <Text style={[styles.appTitle, { color: colors.text }]}>QuoteForge</Text>
+            <Text style={[styles.companyName, { color: colors.text }]}>{companyHeading}</Text>
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity
@@ -177,8 +179,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+  brandMark: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 2, opacity: 0.85 },
   greeting: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 2 },
-  appTitle: { fontSize: 26, fontFamily: "Inter_700Bold" },
+  companyName: { fontSize: 24, fontFamily: "Inter_700Bold" },
   newBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 24 },
   statCard: { flex: 1, padding: 14, borderRadius: 14, borderWidth: 1, gap: 6 },
