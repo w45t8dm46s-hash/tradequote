@@ -13,6 +13,7 @@ type PriceInfo = {
 };
 
 import { getApiBaseUrl as getBaseUrl } from "@/lib/api";
+import BottomNav from "@/components/BottomNav";
 
 export default function UpgradeScreen() {
   const { getToken } = useAuth();

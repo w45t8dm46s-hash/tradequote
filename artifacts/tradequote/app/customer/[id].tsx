@@ -13,6 +13,7 @@ import { useInvoices } from "@/context/InvoicesContext";
 import { useJobs } from "@/context/JobsContext";
 import { useQuotes } from "@/context/QuotesContext";
 import { useColors } from "@/hooks/useColors";
+import BottomNav from "@/components/BottomNav";
 
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

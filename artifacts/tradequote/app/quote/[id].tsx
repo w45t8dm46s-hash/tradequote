@@ -9,6 +9,7 @@ import { type QuoteStatus, useQuotes } from "@/context/QuotesContext";
 import { useSettings } from "@/context/SettingsContext";
 import { printQuote } from "@/lib/quotePdf";
 import { useColors } from "@/hooks/useColors";
+import BottomNav from "@/components/BottomNav";
 
 const STATUS_OPTIONS: { value: QuoteStatus; label: string; icon: string; color: string }[] = [
   { value: "draft", label: "Draft", icon: "file", color: "#6B7280" },

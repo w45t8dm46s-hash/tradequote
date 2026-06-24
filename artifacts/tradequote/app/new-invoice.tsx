@@ -10,6 +10,7 @@ import { useCustomers } from "@/context/CustomersContext";
 import { type Invoice, useInvoices } from "@/context/InvoicesContext";
 import { type LineItem, useQuotes } from "@/context/QuotesContext";
 import { useColors } from "@/hooks/useColors";
+import BottomNav from "@/components/BottomNav";
 
 function genId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
 function genInvNum() { return `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 900) + 100}`; }

@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
 import { getApiBaseUrl } from "@/lib/api";
+import BottomNav from "@/components/BottomNav";
 
 type MeResponse = {
   id: string;

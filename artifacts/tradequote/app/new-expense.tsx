@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory, useExpenses } from "@/context/ExpensesContext";
 import { useColors } from "@/hooks/useColors";
+import BottomNav from "@/components/BottomNav";
 
 function genId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
 

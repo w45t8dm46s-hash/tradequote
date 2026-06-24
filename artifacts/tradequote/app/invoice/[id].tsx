@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type InvoiceStatus, useInvoices } from "@/context/InvoicesContext";
 import { useColors } from "@/hooks/useColors";
+import BottomNav from "@/components/BottomNav";
 
 const STATUS_OPTIONS: { value: InvoiceStatus; label: string; color: string }[] = [
   { value: "draft", label: "Draft", color: "#6B7280" },

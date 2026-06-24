@@ -27,6 +27,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 
 import { TRADES, getTradeById } from "@/lib/trades";
+import BottomNav from "@/components/BottomNav";
 
 type Step = "type" | "details" | "generating" | "preview";
 

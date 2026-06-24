@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type Customer, useCustomers } from "@/context/CustomersContext";
 import { useColors } from "@/hooks/useColors";
+import BottomNav from "@/components/BottomNav";
 
 function genId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
 

@@ -7,6 +7,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { type BusinessSettings, useSettings } from "@/context/SettingsContext";
 import TradePicker from "@/components/TradePicker";
+import BottomNav from "@/components/BottomNav";
 import { TRADES, getTradeById } from "@/lib/trades";
 
 const BRAND_PRESETS = ["#FF6B35", "#2563EB", "#16A34A", "#0F172A", "#9333EA", "#DC2626"];

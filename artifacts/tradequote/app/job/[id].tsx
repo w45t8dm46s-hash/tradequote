@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type JobStatus, useJobs } from "@/context/JobsContext";
 import { useColors } from "@/hooks/useColors";
+import BottomNav from "@/components/BottomNav";
 import { getApiBaseUrl } from "@/lib/api";
 
 const STATUS_OPTIONS: { value: JobStatus; label: string; color: string }[] = [

@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { type LineItem, type Quote, useQuotes } from "@/context/QuotesContext";
 import { useSettings } from "@/context/SettingsContext";
+import BottomNav from "@/components/BottomNav";
 
 function toNum(s: string): number {
   const n = Number(String(s).replace(/[^\d.\-]/g, ""));
