@@ -76,7 +76,7 @@ export default function EditQuoteScreen() {
         total: recalc.total,
         validDays: draft.validDays,
       });
-      router.replace("/(tabs)/" as any);
+      router.replace("/(tabs)/quotes" as any);
     } catch (e: any) {
       setError(e?.message || "Failed to save");
     }
