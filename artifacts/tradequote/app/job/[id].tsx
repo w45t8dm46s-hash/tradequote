@@ -112,6 +112,23 @@ export default function JobDetailScreen() {
           {!!job.address && <Text style={[styles.address, { color: colors.mutedForeground }]}>{job.address}</Text>}
         </View>
 
+        {!!job.quoteId && (
+          <TouchableOpacity
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push({ pathname: "/quote/[id]", params: { id: job.quoteId } } as any)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.linkedQuoteRow}>
+              <Feather name="file-text" size={18} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>LINKED QUOTE</Text>
+                <Text style={[styles.linkedQuoteTitle, { color: colors.text }]}>Open Related Quote</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            </View>
+          </TouchableOpacity>
+        )}
+
         {!!job.notes && (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>NOTES</Text>
@@ -199,4 +216,15 @@ const styles = StyleSheet.create({
   regenerateBtn: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   shareFollowUpBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, gap: 6 },
   shareFollowUpText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  linkedQuoteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  linkedQuoteTitle: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    marginTop: 2,
+  },
 });
