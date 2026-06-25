@@ -76,13 +76,14 @@ export default function EditQuoteScreen() {
         total: recalc.total,
         validDays: draft.validDays,
       });
-      router.back();
+      router.replace("/(tabs)/" as any);
     } catch (e: any) {
       setError(e?.message || "Failed to save");
     }
   };
 
   return (
+    <>
     <ScrollView style={{ flex: 1, backgroundColor: "#FAFAFA" }} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} style={styles.iconBtn}>
@@ -192,6 +193,8 @@ export default function EditQuoteScreen() {
         <Text style={styles.saveBtnText}>Save changes</Text>
       </Pressable>
     </ScrollView>
+      <BottomNav />
+    </>
   );
 }
 
