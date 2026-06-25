@@ -145,7 +145,16 @@ export default function NewJobScreen() {
           </View>
         </View>
 
-        <View style={styles.row}>
+        <TouchableOpacity
+        style={[styles.btn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
+        onPress={() => router.push("/(tabs)/schedule" as any)}
+        activeOpacity={0.85}
+      >
+        <Feather name="calendar" size={18} color={colors.primary} />
+        <Text style={[styles.btnText, { color: colors.primary }]}>View Schedule Calendar</Text>
+      </TouchableOpacity>
+
+      <View style={styles.row}>
           <View style={[styles.fieldGroup, { flex: 1 }]}>
             <Text style={[styles.label, { color: colors.text }]}>Date</Text>
             <TextInput style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
