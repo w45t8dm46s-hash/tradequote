@@ -5,7 +5,7 @@ import { FlatList, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, Vie
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { JobCard } from "@/components/JobCard";
-import { type JobStatus, useJobs } from "@/context/JobsContext";
+import { type Job, type JobStatus, useJobs } from "@/context/JobsContext";
 import { useColors } from "@/hooks/useColors";
 
 const FILTERS: { label: string; value: JobStatus | "all" }[] = [
@@ -50,7 +50,13 @@ export default function ScheduleScreen() {
   const jobsByDate = useMemo(() => {
     const map = new Map<string, number>();
     for (const j of jobs) {
-      map.set(j.scheduledDate, (map.get(j.scheduledDate) ?? 0) + 1);
+      const start = new Date(j.scheduledDate);
+      const duration = Math.max(1, j.durationDays ?? 1);
+      for (let offset = 0; offset < duration; offset++) {
+        const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset);
+        const key = toDateKey(date);
+        map.set(key, (map.get(key) ?? 0) + 1);
+      }
     }
     return map;
   }, [jobs]);
@@ -77,7 +83,12 @@ export default function ScheduleScreen() {
   }, [cursorMonth]);
 
   const selectedDayJobs = useMemo(
-    () => [...jobs.filter((j) => j.scheduledDate === selectedDate)].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)),
+    () => [...jobs.filter((j) => {
+      const start = new Date(j.scheduledDate);
+      const duration = Math.max(1, j.durationDays ?? 1);
+      const selected = new Date(selectedDate + "T00:00:00");
+      return selected >= start && selected < new Date(start.getFullYear(), start.getMonth(), start.getDate() + duration);
+    })].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)),
     [jobs, selectedDate],
   );
 
@@ -315,4 +326,6 @@ const styles = StyleSheet.create({
   dayHeaderText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
   dayHeaderCount: { fontSize: 13, fontFamily: "Inter_500Medium" },
   dayEmpty: { paddingVertical: 24, alignItems: "center" },
+  scheduleDateBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, borderRadius: 14, gap: 8, marginVertical: 8 },
+  scheduleDateBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
