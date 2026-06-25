@@ -83,7 +83,7 @@ export default function NewInvoiceScreen() {
     };
     await addInvoice(invoice);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    router.replace("/(tabs)/finance" as any);
   };
 
   return (
