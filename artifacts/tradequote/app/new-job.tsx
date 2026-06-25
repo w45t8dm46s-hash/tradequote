@@ -85,7 +85,7 @@ export default function NewJobScreen() {
     };
     await addJob(job);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    router.replace("/(tabs)/schedule" as any);
   };
 
   return (
