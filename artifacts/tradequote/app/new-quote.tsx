@@ -233,10 +233,14 @@ export default function NewQuoteScreen() {
       quoteNumber: generateQuoteNumber(),
     };
 
-    setError("");
-    setGeneratedQuote(quote);
-    setStep("preview");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    try {
+      setError("");
+      await addQuote(quote);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      router.push(`/quote/edit/${quote.id}`);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to create manual quote.");
+    }
   };
 
   const saveQuote = async () => {
@@ -445,12 +449,12 @@ export default function NewQuoteScreen() {
             <Text style={[styles.primaryBtnText, { color: "#fff" }]}>Generate Quote with AI</Text>
           </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.outlineBtn, { borderColor: colors.border, marginTop: 12 }]}
+                style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
                 onPress={createManualQuote}
                 activeOpacity={0.85}
               >
-                <Feather name="edit-3" size={18} color={colors.text} />
-                <Text style={[styles.outlineBtnText, { color: colors.text }]}>Create Basic Quote Manually</Text>
+                <Feather name="edit-3" size={18} color="#fff" />
+                <Text style={[styles.primaryBtnText, { color: "#fff" }]}>Create Manual Quote</Text>
               </TouchableOpacity>
 
         </KeyboardAwareScrollView>
