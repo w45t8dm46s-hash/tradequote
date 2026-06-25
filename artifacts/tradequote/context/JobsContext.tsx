@@ -17,6 +17,7 @@ export interface Job {
   customerId: string;
   customerName: string;
   quoteId?: string;
+  durationDays?: number;
   title: string;
   jobType: string;
   jobTypeLabel: string;

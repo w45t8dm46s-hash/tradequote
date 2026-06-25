@@ -7,8 +7,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useCustomers } from "@/context/CustomersContext";
 import { type Job, type Material, useJobs } from "@/context/JobsContext";
+import { useQuotes } from "@/context/QuotesContext";
 import { useColors } from "@/hooks/useColors";
-import BottomNav from "@/components/BottomNav";
 
 function genId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
 
@@ -29,15 +29,17 @@ export default function NewJobScreen() {
   const insets = useSafeAreaInsets();
   const { addJob } = useJobs();
   const { customers } = useCustomers();
-  const params = useLocalSearchParams<{ customerId?: string; quoteId?: string; customerName?: string; address?: string; materials?: string }>();
+  const params = useLocalSearchParams<{ customerId?: string; quoteId?: string; customerName?: string; address?: string; materials?: string; scheduledDate?: string }>();
   const isWeb = Platform.OS === "web";
 
+  const { quotes } = useQuotes();
   const [customerName, setCustomerName] = useState(params.customerName ?? "");
   const [customerId, setCustomerId] = useState(params.customerId ?? "");
   const [address, setAddress] = useState(params.address ?? "");
   const [jobType, setJobType] = useState("rewire");
-  const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split("T")[0]);
+  const [scheduledDate, setScheduledDate] = useState(params.scheduledDate ?? new Date().toISOString().split("T")[0]);
   const [scheduledTime, setScheduledTime] = useState("09:00");
+  const [durationDays, setDurationDays] = useState(1);
   const [notes, setNotes] = useState("");
   const [materials, setMaterials] = useState<Material[]>(() => {
     if (!params.materials) return [];
@@ -55,17 +57,38 @@ export default function NewJobScreen() {
       return [];
     }
   });
+  const [quoteId, setQuoteId] = useState(params.quoteId ?? "");
   const [newMaterial, setNewMaterial] = useState("");
   const [showPicker, setShowPicker] = useState(false);
+  const [showQuotePicker, setShowQuotePicker] = useState(false);
+  const selectedQuote = quoteId ? quotes.find((q) => q.id === quoteId) : undefined;
 
   useEffect(() => {
-    if (params.customerId && !params.customerName) {
+    if (quoteId && quotes.length > 0) {
+      const quote = quotes.find((q) => q.id === quoteId);
+      if (quote) {
+        setCustomerName(quote.customerName);
+        setAddress(quote.customerAddress ?? "");
+        setCustomerId(quote.customerId ?? "");
+        setJobType(quote.jobType);
+        if (materials.length === 0) {
+          setMaterials(quote.lineItems.map((item) => ({
+            id: genId(),
+            name: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            cost: 0,
+            ordered: false,
+          })));
+        }
+      }
+    } else if (params.customerId && !params.customerName) {
       const c = customers.find((c) => c.id === params.customerId);
       if (c) { setCustomerName(c.name); setAddress(c.address); setCustomerId(c.id); }
     }
-  }, []);
+  }, [quoteId, quotes, materials.length, params.customerId, params.customerName]);
 
-  const selectedType = JOB_TYPES.find((t) => t.id === jobType)!;
+  const selectedType = JOB_TYPES.find((t) => t.id === jobType) ?? JOB_TYPES[0];
 
   const addMaterial = () => {
     if (!newMaterial.trim()) return;
@@ -78,9 +101,20 @@ export default function NewJobScreen() {
   const save = async () => {
     if (!customerName.trim()) return;
     const job: Job = {
-      id: genId(), customerId, customerName: customerName.trim(), quoteId: params.quoteId,
-      title: `${selectedType.label} job`, jobType, jobTypeLabel: selectedType.label,
-      status: "scheduled", scheduledDate, scheduledTime, address, notes, materials,
+      id: genId(),
+      customerId,
+      customerName: customerName.trim(),
+      quoteId: quoteId || undefined,
+      title: `${selectedType.label} job`,
+      jobType,
+      jobTypeLabel: selectedType.label,
+      status: "scheduled",
+      scheduledDate,
+      scheduledTime,
+      durationDays: Math.max(1, durationDays),
+      address,
+      notes,
+      materials,
       createdAt: new Date().toISOString(),
     };
     await addJob(job);
@@ -129,6 +163,37 @@ export default function NewJobScreen() {
         </View>
 
         <View style={styles.fieldGroup}>
+          <Text style={[styles.label, { color: colors.text }]}>Link Quote</Text>
+          <TouchableOpacity
+            style={[styles.input, styles.picker, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => setShowQuotePicker(!showQuotePicker)}
+          >
+            <Text style={[{ color: quoteId ? colors.text : colors.mutedForeground, flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" }]}> 
+              {selectedQuote ? `${selectedQuote.quoteNumber} · ${selectedQuote.customerName}` : "Select a quote to link..."}
+            </Text>
+            <Feather name={showQuotePicker ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          {showQuotePicker && (
+            <View style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+              {quotes.length === 0 ? (
+                <Text style={[styles.dropText, { color: colors.mutedForeground, padding: 14 }]}>No quotes available</Text>
+              ) : (
+                quotes.map((quote) => (
+                  <TouchableOpacity key={quote.id} style={[styles.dropItem, { borderBottomColor: colors.border }]}
+                    onPress={() => { setQuoteId(quote.id); setShowQuotePicker(false); }}
+                  >
+                    <Text style={[styles.dropText, { color: colors.text }]}>{quote.quoteNumber} · {quote.customerName}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          )}
+          {selectedQuote ? (
+            <Text style={[styles.tipText, { color: colors.mutedForeground }]}>Quote linked to this job. You can still adjust date, time and duration.</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.fieldGroup}>
           <Text style={[styles.label, { color: colors.text }]}>Job Type</Text>
           <View style={styles.typeRow}>
             {JOB_TYPES.map((t) => {
@@ -170,10 +235,16 @@ export default function NewJobScreen() {
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: colors.text }]}>Address</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Duration (days)</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-            placeholder="Job site address" placeholderTextColor={colors.mutedForeground}
-            value={address} onChangeText={setAddress} autoCapitalize="words" />
+            placeholder="1" placeholderTextColor={colors.mutedForeground}
+            keyboardType="numeric"
+            value={String(durationDays)}
+            onChangeText={(value) => {
+              const parsed = parseInt(value, 10);
+              setDurationDays(Number.isNaN(parsed) ? 1 : Math.max(1, parsed));
+            }}
+          />
         </View>
 
         <View style={styles.fieldGroup}>
@@ -241,4 +312,5 @@ const styles = StyleSheet.create({
   materialName: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
   btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, borderRadius: 14, gap: 8, marginTop: 4 },
   btnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  tipText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
 });
