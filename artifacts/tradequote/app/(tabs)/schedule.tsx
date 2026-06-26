@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import React, { useMemo, useState, useRef, useEffect } from "react";
-import { FlatList, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, PanResponder, LayoutChangeEvent } from "react-native";
+import { FlatList, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { JobCard } from "@/components/JobCard";
@@ -29,11 +29,7 @@ export default function ScheduleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { jobs, addJob } = useJobs();
-  const params = useLocalSearchParams<{ schedulingQuote?: string }>();
-  const schedulingQuoteRaw = params.schedulingQuote as string | undefined;
-  const schedulingQuote = schedulingQuoteRaw ? JSON.parse(schedulingQuoteRaw) : null;
-  const [schedulingMode, setSchedulingMode] = useState(!!schedulingQuote);
-  const [durationDays, setDurationDays] = useState<number>(Math.max(1, schedulingQuote?.durationDays ?? 1));
+  // No in-app scheduling mode; keep schedule as a viewer of jobs.
   const [filter, setFilter] = useState<JobStatus | "all">("all");
   const [view, setView] = useState<"list" | "month">("list");
   const [cursorMonth, setCursorMonth] = useState(() => {
@@ -89,96 +85,16 @@ export default function ScheduleScreen() {
     return cells;
   }, [cursorMonth]);
 
-  // Selection state for multi-day drag/select
-  const [selectionStart, setSelectionStart] = useState<string | null>(null);
-  const [selectionEnd, setSelectionEnd] = useState<string | null>(null);
-  const gridLayout = useRef<{ width: number; height: number } | null>(null);
+  // No gesture-based selection; keep state minimal.
 
-  const dateKeyInRange = (key: string | null) => {
-    if (!key || !selectionStart || !selectionEnd) return false;
-    const a = new Date(selectionStart + "T00:00:00");
-    const b = new Date(selectionEnd + "T00:00:00");
-    const start = a <= b ? a : b;
-    const end = a <= b ? b : a;
-    const d = new Date(start);
-    while (d <= end) {
-      if (toDateKey(d) === key) return true;
-      d.setDate(d.getDate() + 1);
-    }
-    return false;
-  };
-
-  // map touch coords to cell index
-  const pointToCellIndex = (x: number, y: number) => {
-    const layout = gridLayout.current;
-    if (!layout) return -1;
-    const cellW = layout.width / 7;
-    const cellH = cellW; // aspectRatio 1
-    const col = Math.floor(x / cellW);
-    const row = Math.floor(y / cellH);
-    const idx = row * 7 + col;
-    if (idx < 0 || idx >= monthGrid.length) return -1;
-    return idx;
-  };
-
-  const monthGridRef = useRef(monthGrid);
-  useEffect(() => { monthGridRef.current = monthGrid; }, [monthGrid]);
-
-  const panRef = useRef<any>(null);
-  useEffect(() => {
-    panRef.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => schedulingMode,
-      onMoveShouldSetPanResponder: () => schedulingMode,
-      onPanResponderGrant: (evt) => {
-        const x = evt.nativeEvent.locationX;
-        const y = evt.nativeEvent.locationY;
-        const idx = pointToCellIndex(x, y);
-        const grid = monthGridRef.current;
-        if (idx >= 0 && grid[idx]) {
-          const key = grid[idx].dateKey;
-          if (key) {
-            setSelectionStart(key);
-            setSelectionEnd(key);
-          }
-        }
-      },
-      onPanResponderMove: (evt) => {
-        const x = evt.nativeEvent.locationX;
-        const y = evt.nativeEvent.locationY;
-        const idx = pointToCellIndex(x, y);
-        const grid = monthGridRef.current;
-        if (idx >= 0 && grid[idx]) {
-          const key = grid[idx].dateKey;
-          if (key) setSelectionEnd(key);
-        }
-      },
-      onPanResponderRelease: () => {
-        if (selectionStart && selectionEnd) {
-          const a = new Date(selectionStart + "T00:00:00");
-          const b = new Date(selectionEnd + "T00:00:00");
-          const start = a <= b ? a : b;
-          setSelectedDate(toDateKey(start));
-          const days = Math.max(1, Math.round((Math.abs(b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24)) + 1));
-          setDurationDays(days);
-        }
-      },
-    });
-  }, [schedulingMode, selectionStart, selectionEnd]);
-
-  const onGridLayout = (e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    gridLayout.current = { width, height };
-  };
-
-  const selectedDayJobs = useMemo(
-    () => [...jobs.filter((j) => {
+  const selectedDayJobs = useMemo(() => {
+    return [...jobs.filter((j) => {
       const start = new Date(j.scheduledDate);
       const duration = Math.max(1, j.durationDays ?? 1);
       const selected = new Date(selectedDate + "T00:00:00");
       return selected >= start && selected < new Date(start.getFullYear(), start.getMonth(), start.getDate() + duration);
-    })].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)),
-    [jobs, selectedDate],
-  );
+    })].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+  }, [jobs, selectedDate]);
 
   const todayKey = toDateKey(new Date());
 
@@ -197,13 +113,6 @@ export default function ScheduleScreen() {
     setCursorMonth(new Date(d.getFullYear(), d.getMonth(), 1));
     setSelectedDate(toDateKey(d));
   };
-
-  useEffect(() => {
-    if (!schedulingMode) {
-      setSelectionStart(null);
-      setSelectionEnd(null);
-    }
-  }, [schedulingMode]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -319,13 +228,13 @@ export default function ScheduleScreen() {
             ))}
           </View>
 
-          <View style={styles.calendarGrid} {...(panRef.current ? panRef.current.panHandlers : {})} onLayout={onGridLayout}>
+          <View style={styles.calendarGrid}>
             {monthGrid.map((cell) => {
               if (!cell.date || !cell.dateKey) {
                 return <View key={cell.key} style={styles.calCell} />;
               }
               const isToday = cell.dateKey === todayKey;
-              const isSelected = cell.dateKey === selectedDate || dateKeyInRange(cell.dateKey);
+              const isSelected = cell.dateKey === selectedDate;
               const dayJobs = jobsByDate.get(cell.dateKey) ?? [];
               const count = dayJobs.length;
               const hasJobs = count > 0;
@@ -339,12 +248,7 @@ export default function ScheduleScreen() {
                       borderColor: isToday && !isSelected ? colors.primary : "transparent",
                     },
                   ]}
-                  onPress={() => {
-                    // single tap selects start date when not dragging
-                    setSelectionStart(null);
-                    setSelectionEnd(null);
-                    setSelectedDate(cell.dateKey!);
-                  }}
+                  onPress={() => setSelectedDate(cell.dateKey!)}
                   activeOpacity={0.7}
                 >
                   <Text
@@ -373,60 +277,6 @@ export default function ScheduleScreen() {
               {selectedDayJobs.length} {selectedDayJobs.length === 1 ? "job" : "jobs"}
             </Text>
           </View>
-
-          {schedulingMode && (
-            <View style={{ paddingHorizontal: 16, gap: 8 }}>
-              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>Scheduling Quote</Text>
-                <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={1}>{schedulingQuote?.customerName} · {schedulingQuote?.jobTypeLabel ?? schedulingQuote?.jobType}</Text>
-                <Text style={[styles.cardBody, { color: colors.mutedForeground }]}>Start: {new Date((selectionStart ?? selectedDate) + "T00:00:00").toLocaleDateString("en-GB")}</Text>
-                <Text style={[styles.cardBody, { color: colors.mutedForeground }]}>End: {new Date(((selectionEnd ?? selectedDate)) + "T00:00:00").toLocaleDateString("en-GB")} · {durationDays} day{durationDays>1?"s":""}</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <TouchableOpacity style={[styles.scheduleDateBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]} onPress={() => setDurationDays((d) => Math.max(1, d - 1))} activeOpacity={0.8}>
-                      <Text style={[styles.scheduleDateBtnText, { color: colors.text }]}>−</Text>
-                    </TouchableOpacity>
-                    <View style={[styles.scheduleDateBtn, { backgroundColor: colors.primary }]}> 
-                      <Text style={styles.scheduleDateBtnText}>{durationDays} day{durationDays > 1 ? "s" : ""}</Text>
-                    </View>
-                    <TouchableOpacity style={[styles.scheduleDateBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]} onPress={() => setDurationDays((d) => d + 1)} activeOpacity={0.8}>
-                      <Text style={[styles.scheduleDateBtnText, { color: colors.text }]}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-                  <TouchableOpacity style={[styles.actionBtn, { flex: 1, backgroundColor: colors.primary }]} onPress={async () => {
-                    // build job and save
-                    const id = String(Date.now());
-                    const job = {
-                      id,
-                      customerId: schedulingQuote?.customerId ?? "",
-                      customerName: schedulingQuote?.customerName ?? "",
-                      quoteId: schedulingQuote?.quoteId ?? undefined,
-                      durationDays: durationDays,
-                      title: schedulingQuote?.jobTypeLabel ?? schedulingQuote?.jobType ?? "Job",
-                      jobType: schedulingQuote?.jobType ?? "other",
-                      jobTypeLabel: schedulingQuote?.jobTypeLabel ?? (schedulingQuote?.jobType ?? "Other"),
-                      status: "scheduled" as const,
-                      scheduledDate: new Date(selectedDate + "T00:00:00").toISOString(),
-                      scheduledTime: "09:00",
-                      address: schedulingQuote?.address ?? "",
-                      notes: "",
-                      materials: schedulingQuote?.materials ?? [],
-                      createdAt: new Date().toISOString(),
-                    };
-                    await addJob(job);
-                    setSchedulingMode(false);
-                  }} activeOpacity={0.85}>
-                    <Text style={[styles.actionBtnText, { color: "#fff" }]}>Schedule this quote</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={() => setSchedulingMode(false)} activeOpacity={0.85}>
-                    <Text style={[styles.actionBtnText, { color: colors.text }]}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
 
           {selectedDayJobs.length === 0 ? (
             <View style={styles.dayEmpty}>
