@@ -10,7 +10,23 @@ export interface AuthedRequest extends Request {
 
 const FREE_QUOTE_LIMIT = 5;
 
+
+async function ensureUsersTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id text PRIMARY KEY,
+      email text,
+      name text,
+      quote_count integer DEFAULT 0 NOT NULL,
+      stripe_customer_id text,
+      stripe_subscription_id text,
+      created_at timestamp DEFAULT now() NOT NULL
+    )
+  `);
+}
+
 export async function ensureLocalUser(clerkUserId: string): Promise<{ id: string; email: string | null; quoteCount: number; stripeCustomerId: string | null; stripeSubscriptionId: string | null }> {
+  await ensureUsersTable();
   const existing = await db.select().from(users).where(eq(users.id, clerkUserId)).limit(1);
   if (existing[0]) return existing[0];
 
