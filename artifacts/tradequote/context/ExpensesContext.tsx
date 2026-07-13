@@ -1,5 +1,6 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useAuth } from "@clerk/expo";
+import { getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 
 export const EXPENSE_CATEGORIES = [
   "Materials",
@@ -35,33 +36,88 @@ interface ExpensesContextValue {
 }
 
 const ExpensesContext = createContext<ExpensesContextValue | null>(null);
-const STORAGE_KEY = "@tradequote_expenses";
+const ENTITY_TYPE = "expenses";
 
 export function ExpensesProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getToken } = useAuth();
+
+  const loadExpenses = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      const rows = await parseJsonResponse<{ id: string; payload: Expense }[]>(response);
+      const next = rows
+        .map((row) => row.payload)
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+      setExpenses(next);
+    } catch (error) {
+      console.error("Failed to load expenses", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((d) => d && setExpenses(JSON.parse(d)))
-      .finally(() => setLoading(false));
-  }, []);
+    void loadExpenses();
+  }, [loadExpenses]);
 
-  const save = (list: Expense[]) => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  const syncRecord = useCallback(async (record: Expense) => {
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(record),
+    });
 
-  const addExpense = useCallback(async (e: Expense) => {
-    setExpenses((prev) => { const next = [e, ...prev]; save(next); return next; });
-  }, []);
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || "Failed to save expense");
+    }
+
+    await loadExpenses();
+  }, [getToken, loadExpenses]);
+
+  const addExpense = useCallback(async (expense: Expense) => {
+    setExpenses((prev) => [expense, ...prev]);
+    await syncRecord(expense);
+  }, [syncRecord]);
 
   const updateExpense = useCallback(async (id: string, updates: Partial<Expense>) => {
-    setExpenses((prev) => { const next = prev.map((e) => e.id === id ? { ...e, ...updates } : e); save(next); return next; });
-  }, []);
+    setExpenses((prev) => prev.map((expense) => expense.id === id ? { ...expense, ...updates } : expense));
+
+    const existing = expenses.find((expense) => expense.id === id);
+    if (existing) {
+      await syncRecord({ ...existing, ...updates });
+    }
+  }, [expenses, syncRecord]);
 
   const deleteExpense = useCallback(async (id: string) => {
-    setExpenses((prev) => { const next = prev.filter((e) => e.id !== id); save(next); return next; });
-  }, []);
+    setExpenses((prev) => prev.filter((expense) => expense.id !== id));
 
-  const getExpense = useCallback((id: string) => expenses.find((e) => e.id === id), [expenses]);
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}/${id}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || "Failed to delete expense");
+    }
+
+    await loadExpenses();
+  }, [getToken, loadExpenses]);
+
+  const getExpense = useCallback((id: string) => expenses.find((expense) => expense.id === id), [expenses]);
 
   return (
     <ExpensesContext.Provider value={{ expenses, addExpense, updateExpense, deleteExpense, getExpense, loading }}>

@@ -1,5 +1,6 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useAuth } from "@clerk/expo";
+import { getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 
 export type JobStatus = "scheduled" | "in-progress" | "completed" | "cancelled";
 
@@ -40,31 +41,73 @@ interface JobsContextValue {
 }
 
 const JobsContext = createContext<JobsContextValue | null>(null);
-const STORAGE_KEY = "@tradequote_jobs";
+const ENTITY_TYPE = "jobs";
 
 export function JobsProvider({ children }: { children: React.ReactNode }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getToken } = useAuth();
+
+  const loadJobs = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const rows = await parseJsonResponse<{ id: string; payload: Job }[]>(response);
+      const next = rows.map((row) => row.payload).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setJobs(next);
+    } catch (error) {
+      console.error("Failed to load jobs", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((d) => d && setJobs(JSON.parse(d)))
-      .finally(() => setLoading(false));
-  }, []);
+    void loadJobs();
+  }, [loadJobs]);
 
-  const save = (list: Job[]) => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  const syncRecord = useCallback(async (record: Job) => {
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(record),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || "Failed to save job");
+    }
+    await loadJobs();
+  }, [getToken, loadJobs]);
 
   const addJob = useCallback(async (j: Job) => {
-    setJobs((prev) => { const next = [j, ...prev]; save(next); return next; });
-  }, []);
+    setJobs((prev) => [j, ...prev]);
+    await syncRecord(j);
+  }, [syncRecord]);
 
   const updateJob = useCallback(async (id: string, updates: Partial<Job>) => {
-    setJobs((prev) => { const next = prev.map((j) => j.id === id ? { ...j, ...updates } : j); save(next); return next; });
-  }, []);
+    setJobs((prev) => prev.map((j) => j.id === id ? { ...j, ...updates } : j));
+    const existing = jobs.find((j) => j.id === id);
+    if (existing) {
+      await syncRecord({ ...existing, ...updates });
+    }
+  }, [jobs, syncRecord]);
 
   const deleteJob = useCallback(async (id: string) => {
-    setJobs((prev) => { const next = prev.filter((j) => j.id !== id); save(next); return next; });
-  }, []);
+    setJobs((prev) => prev.filter((j) => j.id !== id));
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}/${id}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || "Failed to delete job");
+    }
+    await loadJobs();
+  }, [getToken, loadJobs]);
 
   const getJob = useCallback((id: string) => jobs.find((j) => j.id === id), [jobs]);
 

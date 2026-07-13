@@ -5,6 +5,7 @@ import meRouter from "./me";
 import stripeRouter from "./stripe";
 import adminTempRouter from "./admin-temp";
 import authAdminRouter from "./auth-admin";
+import userRecordsRouter from "./userRecords";
 
 const router: IRouter = Router();
 
@@ -13,6 +14,7 @@ router.use(meRouter);
 router.use(quotesRouter);
 router.use(stripeRouter);
 router.use(authAdminRouter);
+router.use(userRecordsRouter);
 router.use(adminTempRouter);
 
 export default router;
