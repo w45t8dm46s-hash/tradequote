@@ -1,9 +1,11 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useAuth } from "@clerk/expo";
+import { getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "declined";
 
 export interface LineItem {
+  id?: string;
   description: string;
   quantity: number;
   unit: string;
@@ -45,103 +47,73 @@ interface QuotesContextValue {
 }
 
 const QuotesContext = createContext<QuotesContextValue | null>(null);
-const STORAGE_KEY = "@tradequote_quotes";
+const ENTITY_TYPE = "quotes";
 
 export function QuotesProvider({ children }: { children: React.ReactNode }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getToken } = useAuth();
 
-  useEffect(() => {
-    loadQuotes();
-  }, []);
-
-  const loadQuotes = async () => {
+  const loadQuotes = useCallback(async () => {
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: Quote[] = JSON.parse(stored);
-        const seen = new Set<string>();
-        const deduped = parsed.filter((q) => {
-          if (seen.has(q.id)) return false;
-          seen.add(q.id);
-          return true;
-        });
-        setQuotes(deduped);
-        if (deduped.length !== parsed.length) {
-          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(deduped)).catch(() => {});
-        }
-      }
-    } catch (e) {
-      console.error("Failed to load quotes", e);
+      const token = await getToken();
+      const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const rows = await parseJsonResponse<{ id: string; payload: Quote }[]>(response);
+      const next = rows.map((row) => row.payload).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setQuotes(next);
+    } catch (error) {
+      console.error("Failed to load quotes", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [getToken]);
 
-  const quotesRef = useRef<Quote[]>([]);
-  useEffect(() => { quotesRef.current = quotes; }, [quotes]);
-  const mutationChain = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    void loadQuotes();
+  }, [loadQuotes]);
 
-  const stripHeavyPhotos = (q: Quote): Quote => ({
-    ...q,
-    photos: (q.photos ?? []).map((p) => (typeof p === "string" && p.startsWith("data:") ? "" : p)).filter(Boolean),
-  });
-
-  const isQuotaError = (e: any): boolean => {
-    if (!e) return false;
-    const name = String(e?.name ?? "");
-    const msg = String(e?.message ?? "");
-    return name === "QuotaExceededError" || /quota|exceed|storage/i.test(msg);
-  };
-
-  const trySave = async (list: Quote[]): Promise<Quote[]> => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-      return list;
-    } catch (e) {
-      if (!isQuotaError(e)) {
-        console.error("Failed to persist quotes", e);
-        throw new Error("Failed to save quote. Please try again.");
-      }
-      const lighter = list.map(stripHeavyPhotos);
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(lighter));
-        return lighter;
-      } catch (e2) {
-        console.error("Failed to persist quotes (after stripping photos)", e2);
-        throw new Error("Your device storage is full. Please delete some old quotes and try again.");
-      }
+  const syncRecord = useCallback(async (record: Quote) => {
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(record),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || "Failed to save quote");
     }
-  };
+    await loadQuotes();
+  }, [getToken, loadQuotes]);
 
-  const enqueueMutation = useCallback(<T,>(fn: (current: Quote[]) => Quote[]): Promise<void> => {
-    const run = async () => {
-      const next = fn(quotesRef.current);
-      const saved = await trySave(next);
-      quotesRef.current = saved;
-      setQuotes(saved);
-    };
-    const result = mutationChain.current.then(run, run);
-    mutationChain.current = result.catch(() => {});
-    return result;
-  }, []);
+  const addQuote = useCallback(async (quote: Quote) => {
+    setQuotes((prev) => [quote, ...prev]);
+    await syncRecord(quote);
+  }, [syncRecord]);
 
-  const addQuote = useCallback((quote: Quote) =>
-    enqueueMutation((cur) => {
-      const idx = cur.findIndex((q) => q.id === quote.id);
-      if (idx >= 0) {
-        const next = [...cur];
-        next[idx] = quote;
-        return next;
-      }
-      return [quote, ...cur];
-    }), [enqueueMutation]);
+  const updateQuote = useCallback(async (id: string, updates: Partial<Quote>) => {
+    setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, ...updates } : q));
+    const existing = quotes.find((q) => q.id === id);
+    if (existing) {
+      await syncRecord({ ...existing, ...updates });
+    }
+  }, [quotes, syncRecord]);
 
-  const updateQuote = useCallback((id: string, updates: Partial<Quote>) =>
-    enqueueMutation((cur) => cur.map((q) => q.id === id ? { ...q, ...updates } : q)), [enqueueMutation]);
-
-  const deleteQuote = useCallback((id: string) =>
-    enqueueMutation((cur) => cur.filter((q) => q.id !== id)), [enqueueMutation]);
+  const deleteQuote = useCallback(async (id: string) => {
+    setQuotes((prev) => prev.filter((q) => q.id !== id));
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}/${id}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || "Failed to delete quote");
+    }
+    await loadQuotes();
+  }, [getToken, loadQuotes]);
 
   const getQuote = useCallback((id: string) => quotes.find((q) => q.id === id), [quotes]);
 

@@ -1,5 +1,6 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useAuth } from "@clerk/expo";
+import { getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 import { type LineItem } from "./QuotesContext";
 
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "partial";
@@ -34,31 +35,73 @@ interface InvoicesContextValue {
 }
 
 const InvoicesContext = createContext<InvoicesContextValue | null>(null);
-const STORAGE_KEY = "@tradequote_invoices";
+const ENTITY_TYPE = "invoices";
 
 export function InvoicesProvider({ children }: { children: React.ReactNode }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getToken } = useAuth();
+
+  const loadInvoices = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const rows = await parseJsonResponse<{ id: string; payload: Invoice }[]>(response);
+      const next = rows.map((row) => row.payload).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setInvoices(next);
+    } catch (error) {
+      console.error("Failed to load invoices", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((d) => d && setInvoices(JSON.parse(d)))
-      .finally(() => setLoading(false));
-  }, []);
+    void loadInvoices();
+  }, [loadInvoices]);
 
-  const save = (list: Invoice[]) => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  const syncRecord = useCallback(async (record: Invoice) => {
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(record),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || "Failed to save invoice");
+    }
+    await loadInvoices();
+  }, [getToken, loadInvoices]);
 
   const addInvoice = useCallback(async (inv: Invoice) => {
-    setInvoices((prev) => { const next = [inv, ...prev]; save(next); return next; });
-  }, []);
+    setInvoices((prev) => [inv, ...prev]);
+    await syncRecord(inv);
+  }, [syncRecord]);
 
   const updateInvoice = useCallback(async (id: string, updates: Partial<Invoice>) => {
-    setInvoices((prev) => { const next = prev.map((i) => i.id === id ? { ...i, ...updates } : i); save(next); return next; });
-  }, []);
+    setInvoices((prev) => prev.map((i) => i.id === id ? { ...i, ...updates } : i));
+    const existing = invoices.find((i) => i.id === id);
+    if (existing) {
+      await syncRecord({ ...existing, ...updates });
+    }
+  }, [invoices, syncRecord]);
 
   const deleteInvoice = useCallback(async (id: string) => {
-    setInvoices((prev) => { const next = prev.filter((i) => i.id !== id); save(next); return next; });
-  }, []);
+    setInvoices((prev) => prev.filter((i) => i.id !== id));
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}/${id}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || "Failed to delete invoice");
+    }
+    await loadInvoices();
+  }, [getToken, loadInvoices]);
 
   const getInvoice = useCallback((id: string) => invoices.find((i) => i.id === id), [invoices]);
 
