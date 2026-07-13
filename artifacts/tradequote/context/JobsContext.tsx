@@ -83,7 +83,6 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
   }, [getToken, loadJobs]);
 
   const addJob = useCallback(async (j: Job) => {
-    setJobs((prev) => [j, ...prev]);
     await syncRecord(j);
   }, [syncRecord]);
 
