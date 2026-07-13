@@ -64,7 +64,6 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
   }, [getToken, loadCustomers]);
 
   const addCustomer = useCallback(async (c: Customer) => {
-    setCustomers((prev) => [c, ...prev]);
     await syncRecord(c);
   }, [syncRecord]);
 

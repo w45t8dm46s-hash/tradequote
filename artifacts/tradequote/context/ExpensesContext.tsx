@@ -87,7 +87,6 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
   }, [getToken, loadExpenses]);
 
   const addExpense = useCallback(async (expense: Expense) => {
-    setExpenses((prev) => [expense, ...prev]);
     await syncRecord(expense);
   }, [syncRecord]);
 

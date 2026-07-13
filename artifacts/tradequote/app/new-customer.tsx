@@ -24,16 +24,37 @@ export default function NewCustomerScreen() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    if (!name.trim()) { setError("Customer name is required."); return; }
+    if (saving) return;
+    if (!name.trim()) {
+      setError("Customer name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
     const customer: Customer = {
-      id: genId(), name: name.trim(), phone, email, address, notes,
+      id: genId(),
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      address: address.trim(),
+      notes: notes.trim(),
       createdAt: new Date().toISOString(),
     };
-    await addCustomer(customer);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+
+    try {
+      await addCustomer(customer);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.replace("/(tabs)/customers" as any);
+    } catch (e: any) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      setError(e?.message ?? "Failed to save customer. Please try again.");
+      setSaving(false);
+    }
   };
 
   return (
@@ -89,9 +110,14 @@ export default function NewCustomerScreen() {
           />
         </View>
 
-        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={save} activeOpacity={0.85}>
-          <Feather name="user-plus" size={18} color="#fff" />
-          <Text style={styles.btnText}>Save Customer</Text>
+        <TouchableOpacity
+          style={[styles.btn, { backgroundColor: colors.primary, opacity: saving ? 0.65 : 1 }]}
+          onPress={save}
+          disabled={saving}
+          activeOpacity={0.85}
+        >
+          <Feather name={saving ? "loader" : "user-plus"} size={18} color="#fff" />
+          <Text style={styles.btnText}>{saving ? "Saving..." : "Save Customer"}</Text>
         </TouchableOpacity>
       </KeyboardAwareScrollView>
     </View>

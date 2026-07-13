@@ -77,7 +77,6 @@ export function InvoicesProvider({ children }: { children: React.ReactNode }) {
   }, [getToken, loadInvoices]);
 
   const addInvoice = useCallback(async (inv: Invoice) => {
-    setInvoices((prev) => [inv, ...prev]);
     await syncRecord(inv);
   }, [syncRecord]);
 

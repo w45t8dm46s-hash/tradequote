@@ -121,9 +121,21 @@ export default function QuotesScreen() {
           <View style={styles.empty}>
             <Feather name="file-text" size={36} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No quotes found</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              {search ? "Try a different search" : "Create your first quote"}
-            </Text>
+            {search ? (
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Try a different search</Text>
+            ) : (
+              <>
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Create your first quote</Text>
+                <TouchableOpacity
+                  style={[styles.emptyAction, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push("/new-quote")}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="plus" size={16} color="#fff" />
+                  <Text style={styles.emptyActionText}>Create Quote</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         }
         renderItem={({ item }) => <QuoteCard quote={item} />}
@@ -170,4 +182,6 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", marginTop: 8 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  emptyAction: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 12, marginTop: 10 },
+  emptyActionText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

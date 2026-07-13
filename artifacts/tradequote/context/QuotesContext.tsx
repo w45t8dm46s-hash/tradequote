@@ -89,7 +89,6 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
   }, [getToken, loadQuotes]);
 
   const addQuote = useCallback(async (quote: Quote) => {
-    setQuotes((prev) => [quote, ...prev]);
     await syncRecord(quote);
   }, [syncRecord]);
 
