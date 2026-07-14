@@ -105,7 +105,7 @@ export default function NewInvoiceScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
       <KeyboardAwareScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 34 : insets.bottom + 16 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 100 : insets.bottom + 90 }]}
         bottomOffset={16} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.title, { color: colors.text }]}>New Invoice</Text>
@@ -196,6 +196,7 @@ export default function NewInvoiceScreen() {
           <Text style={styles.btnText}>{saving ? "Saving..." : "Create Invoice"}</Text>
         </TouchableOpacity>
       </KeyboardAwareScrollView>
+      <BottomNav />
     </View>
   );
 }

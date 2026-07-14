@@ -61,7 +61,7 @@ export default function NewCustomerScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
       <KeyboardAwareScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 34 : insets.bottom + 16 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 100 : insets.bottom + 90 }]}
         bottomOffset={16}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -120,6 +120,7 @@ export default function NewCustomerScreen() {
           <Text style={styles.btnText}>{saving ? "Saving..." : "Save Customer"}</Text>
         </TouchableOpacity>
       </KeyboardAwareScrollView>
+      <BottomNav />
     </View>
   );
 }

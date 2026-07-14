@@ -47,7 +47,7 @@ export default function NewQuoteScreen() {
   const insets = useSafeAreaInsets();
   const { addQuote } = useQuotes();
   const { customers } = useCustomers();
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
   const params = useLocalSearchParams<{ customerId?: string; customerName?: string; customerAddress?: string }>();
   const isWeb = Platform.OS === "web";
@@ -66,6 +66,7 @@ export default function NewQuoteScreen() {
   const [manualSaving, setManualSaving] = useState(false);
   const [quoteSaving, setQuoteSaving] = useState(false);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [improvingDescription, setImprovingDescription] = useState(false);
 
   const currentTrade = getTradeById(settings.trade) ?? TRADES[0];
   const JOB_TYPES = currentTrade.jobTypes;
@@ -191,6 +192,49 @@ export default function NewQuoteScreen() {
   };
 
 
+  const improveDescription = async () => {
+    if (!settings.aiAssistanceEnabled || improvingDescription) return;
+
+    if (!description.trim()) {
+      setError("Add rough job description first.");
+      return;
+    }
+
+    setImprovingDescription(true);
+    setError("");
+
+    try {
+      const token = await getToken();
+      const response = await fetch(`${getApiBaseUrl()}/api/ai/improve-wording`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          text: description,
+          context: `${currentTrade.label} quote. ${selectedType?.label ?? ""}. Improve the customer-facing job description only. Do not add prices.`,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Failed to improve wording.");
+      }
+
+      if (data?.improvedText) {
+        setDescription(String(data.improvedText).trim());
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to improve wording.");
+    } finally {
+      setImprovingDescription(false);
+    }
+  };
+
+
   const createManualQuote = async () => {
     if (manualSaving) return;
     if (!customerName.trim() || !description.trim()) {
@@ -282,7 +326,7 @@ export default function NewQuoteScreen() {
     }
   };
 
-  const bottomPad = isWeb ? 34 : insets.bottom + 16;
+  const bottomPad = isWeb ? 100 : insets.bottom + 90;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -337,6 +381,23 @@ export default function NewQuoteScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
+
+
+          <View style={[styles.aiBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.aiHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.aiTitle, { color: colors.text }]}>AI Assistance</Text>
+                <Text style={[styles.aiHint, { color: colors.mutedForeground }]}>Improves wording only. It will not price jobs or change totals.</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.aiToggle, { backgroundColor: settings.aiAssistanceEnabled ? colors.primary : colors.muted }]}
+                onPress={() => { void updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled }); }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.aiToggleText}>{settings.aiAssistanceEnabled ? "On" : "Off"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <View style={styles.fieldGroup}>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Customer Name *</Text>
@@ -393,6 +454,19 @@ export default function NewQuoteScreen() {
               onChangeText={setDescription}
               multiline numberOfLines={4} textAlignVertical="top"
             />
+            {settings.aiAssistanceEnabled && (
+              <TouchableOpacity
+                style={[styles.secondaryAiBtn, { backgroundColor: colors.secondary, opacity: improvingDescription ? 0.65 : 1 }]}
+                onPress={improveDescription}
+                disabled={improvingDescription}
+                activeOpacity={0.85}
+              >
+                <Feather name="edit-3" size={15} color={colors.primary} />
+                <Text style={[styles.secondaryAiBtnText, { color: colors.primary }]}>
+                  {improvingDescription ? "Improving..." : "Improve wording"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.fieldGroup}>
@@ -457,10 +531,12 @@ export default function NewQuoteScreen() {
             )}
           </View>
 
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={generateQuote} activeOpacity={0.85}>
-            <Feather name="cpu" size={18} color="#fff" />
-            <Text style={[styles.primaryBtnText, { color: "#fff" }]}>Generate Quote with AI</Text>
-          </TouchableOpacity>
+          {settings.aiAssistanceEnabled && (
+            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={generateQuote} activeOpacity={0.85}>
+              <Feather name="cpu" size={18} color="#fff" />
+              <Text style={[styles.primaryBtnText, { color: "#fff" }]}>Generate Quote with AI</Text>
+            </TouchableOpacity>
+          )}
               <TouchableOpacity
                 style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
                 onPress={createManualQuote}
@@ -549,6 +625,7 @@ export default function NewQuoteScreen() {
           </View>
         </ScrollView>
       )}
+      <BottomNav />
     </View>
   );
 }
@@ -615,4 +692,13 @@ const styles = StyleSheet.create({
   actionButtons: { flexDirection: "row", gap: 10 },
   outlineBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, borderRadius: 14, gap: 8, borderWidth: 1, paddingHorizontal: 20 },
   outlineBtnText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  aiBox: { padding: 14, borderRadius: 14, borderWidth: 1, gap: 10 },
+  aiHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  aiTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  aiHint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17, marginTop: 2 },
+  aiToggle: { minWidth: 54, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, alignItems: "center" },
+  aiToggleText: { color: "#fff", fontSize: 12, fontFamily: "Inter_700Bold" },
+  secondaryAiBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
+  secondaryAiBtnText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+
 });

@@ -23,6 +23,7 @@ export interface BusinessSettings {
   validDays: number;
   paymentTerms: string;
   footerNote: string;
+  aiAssistanceEnabled: boolean;
 }
 
 const DEFAULTS: BusinessSettings = {
@@ -47,6 +48,7 @@ const DEFAULTS: BusinessSettings = {
   validDays: 30,
   paymentTerms: "Payment due within 14 days of invoice.",
   footerNote: "",
+  aiAssistanceEnabled: true,
 };
 
 interface SettingsContextValue {
