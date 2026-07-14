@@ -121,7 +121,7 @@ export default function ScheduleScreen() {
           <Text style={[styles.title, { color: colors.text }]}>Schedule</Text>
           <TouchableOpacity
             style={[styles.newBtn, { backgroundColor: colors.primary }]}
-            onPress={() => router.push("/new-job")}
+            onPress={() => router.push({ pathname: "/new-job", params: { scheduledDate: selectedDate } } as any)}
             activeOpacity={0.85}
           >
             <Feather name="plus" size={20} color="#fff" />
@@ -277,6 +277,15 @@ export default function ScheduleScreen() {
               {selectedDayJobs.length} {selectedDayJobs.length === 1 ? "job" : "jobs"}
             </Text>
           </View>
+
+          <TouchableOpacity
+            style={[styles.scheduleDateBtn, { backgroundColor: colors.primary }]}
+            onPress={() => router.push({ pathname: "/new-job", params: { scheduledDate: selectedDate } } as any)}
+            activeOpacity={0.85}
+          >
+            <Feather name="plus-circle" size={16} color="#fff" />
+            <Text style={styles.scheduleDateBtnText}>Schedule job on this date</Text>
+          </TouchableOpacity>
 
           {selectedDayJobs.length === 0 ? (
             <View style={styles.dayEmpty}>
