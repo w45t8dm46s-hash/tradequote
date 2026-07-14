@@ -48,7 +48,7 @@ const DEFAULTS: BusinessSettings = {
   validDays: 30,
   paymentTerms: "Payment due within 14 days of invoice.",
   footerNote: "",
-  aiAssistanceEnabled: true,
+  aiAssistanceEnabled: false,
 };
 
 interface SettingsContextValue {
