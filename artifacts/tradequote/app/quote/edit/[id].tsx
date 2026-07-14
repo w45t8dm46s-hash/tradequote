@@ -14,6 +14,28 @@ function toNum(s: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+
+const GENERIC_SCOPE_TEXT = "Thank you for your enquiry. Please review the quote details below.";
+
+function getInitialDraft(original: Quote | undefined): Quote | null {
+  if (!original) return null;
+
+  const currentScope = String(original.customerSummary ?? "").trim();
+  const roughDescription = String(original.description ?? "").trim();
+  const lineItemDescription = original.lineItems
+    .map((item) => item.description)
+    .filter(Boolean)
+    .join("\n");
+
+  const replacementScope = roughDescription || lineItemDescription;
+
+  if (currentScope === GENERIC_SCOPE_TEXT && replacementScope) {
+    return { ...original, customerSummary: replacementScope };
+  }
+
+  return original;
+}
+
 const UNIT_OPTIONS = [
   "item",
   "each",
@@ -36,7 +58,7 @@ export default function EditQuoteScreen() {
   const { getToken } = useAuth();
 
   const original = getQuote(id);
-  const [draft, setDraft] = useState<Quote | null>(original ?? null);
+  const [draft, setDraft] = useState<Quote | null>(() => getInitialDraft(original));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [openUnitPicker, setOpenUnitPicker] = useState<number | null>(null);
@@ -171,7 +193,7 @@ export default function EditQuoteScreen() {
           <TextInput style={styles.input} value={draft.jobTypeLabel} onChangeText={(v) => setDraft({ ...draft, jobTypeLabel: v })} placeholder="e.g. Consumer Unit" placeholderTextColor="#9CA3AF" />
         </Field>
         <Field label="Scope of work (shown on PDF)">
-          <TextInput style={[styles.input, styles.multi, { minHeight: 90 }]} value={draft.customerSummary} onChangeText={(v) => setDraft({ ...draft, customerSummary: v })} placeholder="What will be done..." placeholderTextColor="#9CA3AF" multiline />
+          <TextInput style={[styles.input, styles.multi, { minHeight: 90 }]} value={draft.customerSummary} onChangeText={(v) => setDraft({ ...draft, customerSummary: v })} placeholder="Describe the work to be carried out for the customer..." placeholderTextColor="#9CA3AF" multiline />
 
           <View style={styles.aiBox}>
             <View style={styles.aiHeader}>
