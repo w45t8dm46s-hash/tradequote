@@ -70,7 +70,7 @@ export default function QuoteDetailScreen() {
     day: "numeric", month: "long", year: "numeric",
   });
 
-  const bottomPad = isWeb ? 34 : insets.bottom + 16;
+  const bottomPad = isWeb ? 100 : insets.bottom + 90;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -220,6 +220,7 @@ export default function QuoteDetailScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      <BottomNav />
     </View>
   );
 }

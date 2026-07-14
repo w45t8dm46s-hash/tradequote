@@ -53,7 +53,7 @@ export default function NewExpenseScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 34 : insets.bottom + 16 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 100 : insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.title, { color: colors.text }]}>Log Expense</Text>
@@ -115,6 +115,7 @@ export default function NewExpenseScreen() {
           <Text style={styles.btnText}>{saving ? "Saving..." : "Save Expense"}</Text>
         </TouchableOpacity>
       </ScrollView>
+      <BottomNav />
     </View>
   );
 }

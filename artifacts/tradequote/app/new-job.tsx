@@ -9,6 +9,7 @@ import { useCustomers } from "@/context/CustomersContext";
 import { type Job, type Material, useJobs } from "@/context/JobsContext";
 import { useQuotes } from "@/context/QuotesContext";
 import { useColors } from "@/hooks/useColors";
+import BottomNav from "@/components/BottomNav";
 
 function genId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
 
@@ -141,7 +142,7 @@ export default function NewJobScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 34 : insets.bottom + 16 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 100 : insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.title, { color: colors.text }]}>Schedule Job</Text>
@@ -301,6 +302,7 @@ export default function NewJobScreen() {
           <Text style={styles.btnText}>{saving ? "Scheduling..." : "Schedule Job"}</Text>
         </TouchableOpacity>
       </ScrollView>
+      <BottomNav />
     </View>
   );
 }

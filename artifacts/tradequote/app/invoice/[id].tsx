@@ -6,8 +6,10 @@ import { Alert, Platform, ScrollView, Share, StyleSheet, Text, TextInput, Toucha
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type InvoiceStatus, useInvoices } from "@/context/InvoicesContext";
+import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import BottomNav from "@/components/BottomNav";
+import { printInvoice } from "@/lib/invoicePdf";
 
 const STATUS_OPTIONS: { value: InvoiceStatus; label: string; color: string }[] = [
   { value: "draft", label: "Draft", color: "#6B7280" },
@@ -21,6 +23,7 @@ export default function InvoiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getInvoice, updateInvoice, deleteInvoice } = useInvoices();
   const colors = useColors();
+  const { settings } = useSettings();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
 
@@ -105,6 +108,9 @@ export default function InvoiceDetailScreen() {
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()}><Feather name="arrow-left" size={20} color={colors.text} /></TouchableOpacity>
           <View style={styles.topActions}>
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => printInvoice(invoice, settings)}>
+              <Feather name="printer" size={18} color={colors.text} />
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleShare}>
               <Feather name="share-2" size={18} color={colors.text} />
             </TouchableOpacity>
@@ -194,11 +200,17 @@ export default function InvoiceDetailScreen() {
           )}
         </View>
 
+        <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]} onPress={() => printInvoice(invoice, settings)} activeOpacity={0.85}>
+          <Feather name="download" size={18} color={colors.text} />
+          <Text style={[styles.shareBtnText, { color: colors.text }]}>Download PDF</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.primary }]} onPress={handleShare} activeOpacity={0.85}>
           <Feather name="share-2" size={18} color="#fff" />
           <Text style={styles.shareBtnText}>Share Invoice</Text>
         </TouchableOpacity>
       </ScrollView>
+      <BottomNav />
     </View>
   );
 }

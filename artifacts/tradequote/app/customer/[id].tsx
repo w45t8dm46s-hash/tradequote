@@ -112,7 +112,7 @@ export default function CustomerDetailScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 34 : insets.bottom + 16 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 100 : insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topBar}>
@@ -224,6 +224,7 @@ export default function CustomerDetailScreen() {
           </View>
         )}
       </ScrollView>
+      <BottomNav />
     </View>
   );
 }
