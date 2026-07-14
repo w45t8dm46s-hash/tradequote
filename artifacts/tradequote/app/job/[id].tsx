@@ -28,6 +28,13 @@ export default function JobDetailScreen() {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [generatingFollowUp, setGeneratingFollowUp] = useState(false);
   const [followUpMessage, setFollowUpMessage] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editCustomerName, setEditCustomerName] = useState(job?.customerName ?? "");
+  const [editDate, setEditDate] = useState(job?.scheduledDate ?? "");
+  const [editTime, setEditTime] = useState(job?.scheduledTime ?? "09:00");
+  const [editDurationDays, setEditDurationDays] = useState(String(job?.durationDays ?? 1));
+  const [editAddress, setEditAddress] = useState(job?.address ?? "");
+  const [editNotes, setEditNotes] = useState(job?.notes ?? "");
 
   if (!job) {
     return (
@@ -70,10 +77,48 @@ export default function JobDetailScreen() {
     }
   };
 
+  const startEditing = () => {
+    setEditCustomerName(job.customerName);
+    setEditDate(job.scheduledDate);
+    setEditTime(job.scheduledTime || "09:00");
+    setEditDurationDays(String(job.durationDays ?? 1));
+    setEditAddress(job.address ?? "");
+    setEditNotes(job.notes ?? "");
+    setIsEditing(true);
+  };
+
+  const saveEdits = async () => {
+    if (!editCustomerName.trim()) return;
+
+    await updateJob(job.id, {
+      customerName: editCustomerName.trim(),
+      scheduledDate: editDate.trim(),
+      scheduledTime: editTime.trim(),
+      durationDays: Math.max(1, parseInt(editDurationDays, 10) || 1),
+      address: editAddress.trim(),
+      notes: editNotes.trim(),
+    });
+
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setIsEditing(false);
+  };
+
   const handleDelete = () => {
-    Alert.alert("Delete Job", "Are you sure?", [
+    const doDelete = async () => {
+      await deleteJob(job.id);
+      router.replace("/(tabs)/schedule" as any);
+    };
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (window.confirm("Delete this scheduled job?")) {
+        void doDelete();
+      }
+      return;
+    }
+
+    Alert.alert("Delete Job", "Delete this scheduled job?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { await deleteJob(job.id); router.back(); } },
+      { text: "Delete", style: "destructive", onPress: () => { void doDelete(); } },
     ]);
   };
 
@@ -82,9 +127,14 @@ export default function JobDetailScreen() {
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: isWeb ? 34 : insets.bottom + 16 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()}><Feather name="arrow-left" size={20} color={colors.text} /></TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={handleDelete}>
-            <Feather name="trash-2" size={18} color="#EF4444" />
-          </TouchableOpacity>
+          <View style={styles.topActions}>
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={startEditing}>
+              <Feather name="edit-2" size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={handleDelete}>
+              <Feather name="trash-2" size={18} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.heroSection}>
@@ -111,6 +161,83 @@ export default function JobDetailScreen() {
           <Text style={[styles.dateText, { color: colors.mutedForeground }]}>{date}{job.scheduledTime ? ` · ${job.scheduledTime}` : ""}</Text>
           {!!job.address && <Text style={[styles.address, { color: colors.mutedForeground }]}>{job.address}</Text>}
         </View>
+
+        {isEditing && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>EDIT JOB</Text>
+
+            <Text style={[styles.editLabel, { color: colors.text }]}>Customer</Text>
+            <TextInput
+              style={[styles.editInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
+              value={editCustomerName}
+              onChangeText={setEditCustomerName}
+              placeholder="Customer name"
+              placeholderTextColor={colors.mutedForeground}
+            />
+
+            <View style={styles.editRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.editLabel, { color: colors.text }]}>Date</Text>
+                <TextInput
+                  style={[styles.editInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
+                  value={editDate}
+                  onChangeText={setEditDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.editLabel, { color: colors.text }]}>Time</Text>
+                <TextInput
+                  style={[styles.editInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
+                  value={editTime}
+                  onChangeText={setEditTime}
+                  placeholder="09:00"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </View>
+            </View>
+
+            <Text style={[styles.editLabel, { color: colors.text }]}>Duration days</Text>
+            <TextInput
+              style={[styles.editInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
+              value={editDurationDays}
+              onChangeText={setEditDurationDays}
+              keyboardType="numeric"
+              placeholder="1"
+              placeholderTextColor={colors.mutedForeground}
+            />
+
+            <Text style={[styles.editLabel, { color: colors.text }]}>Address</Text>
+            <TextInput
+              style={[styles.editInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
+              value={editAddress}
+              onChangeText={setEditAddress}
+              placeholder="Job address"
+              placeholderTextColor={colors.mutedForeground}
+            />
+
+            <Text style={[styles.editLabel, { color: colors.text }]}>Notes</Text>
+            <TextInput
+              style={[styles.editInput, styles.editTextArea, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
+              value={editNotes}
+              onChangeText={setEditNotes}
+              multiline
+              placeholder="Notes"
+              placeholderTextColor={colors.mutedForeground}
+            />
+
+            <View style={styles.editActions}>
+              <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={() => setIsEditing(false)}>
+                <Text style={[styles.cancelBtnText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveEditBtn, { backgroundColor: colors.primary }]} onPress={saveEdits}>
+                <Feather name="check" size={16} color="#fff" />
+                <Text style={styles.saveEditBtnText}>Save changes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {!!job.quoteId && (
           <TouchableOpacity
@@ -189,6 +316,7 @@ const styles = StyleSheet.create({
   link: { fontSize: 15, fontFamily: "Inter_500Medium" },
   scroll: { padding: 16, gap: 12 },
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  topActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   heroSection: { gap: 6 },
   metaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -206,6 +334,15 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
   cardBody: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
   cardHint: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: -4 },
+  editLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", marginTop: 4 },
+  editInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular" },
+  editTextArea: { minHeight: 80, textAlignVertical: "top" },
+  editRow: { flexDirection: "row", gap: 10 },
+  editActions: { flexDirection: "row", gap: 10, marginTop: 6 },
+  cancelBtn: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  cancelBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  saveEditBtn: { flex: 1, flexDirection: "row", gap: 6, borderRadius: 12, paddingVertical: 12, alignItems: "center", justifyContent: "center" },
+  saveEditBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
   materialRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
   materialName: { fontSize: 14, fontFamily: "Inter_400Regular", flex: 1 },
   generateBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, borderRadius: 12, gap: 8 },
