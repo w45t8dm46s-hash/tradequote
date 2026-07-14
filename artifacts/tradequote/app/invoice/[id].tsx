@@ -28,6 +28,7 @@ export default function InvoiceDetailScreen() {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showPaymentInput, setShowPaymentInput] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [savingPayment, setSavingPayment] = useState(false);
 
   if (!invoice) {
     return (
@@ -43,14 +44,34 @@ export default function InvoiceDetailScreen() {
   const dueDate = new Date(invoice.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   const recordPayment = async () => {
+    if (savingPayment) return;
     const amt = parseFloat(paymentAmount);
     if (!amt || amt <= 0) return;
-    const newPaid = Math.min(invoice.paidAmount + amt, invoice.total);
-    const newStatus: InvoiceStatus = newPaid >= invoice.total ? "paid" : "partial";
-    await updateInvoice(invoice.id, { paidAmount: newPaid, status: newStatus });
-    setShowPaymentInput(false);
-    setPaymentAmount("");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    setSavingPayment(true);
+    try {
+      const newPaid = Math.min(invoice.paidAmount + amt, invoice.total);
+      const newStatus: InvoiceStatus = newPaid >= invoice.total ? "paid" : "partial";
+      await updateInvoice(invoice.id, { paidAmount: newPaid, status: newStatus });
+      setShowPaymentInput(false);
+      setPaymentAmount("");
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const markPaid = async () => {
+    if (savingPayment) return;
+    setSavingPayment(true);
+    try {
+      await updateInvoice(invoice.id, { paidAmount: invoice.total, status: "paid" });
+      setShowPaymentInput(false);
+      setPaymentAmount("");
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } finally {
+      setSavingPayment(false);
+    }
   };
 
   const handleShare = async () => {
@@ -60,9 +81,21 @@ export default function InvoiceDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert("Delete Invoice", "Are you sure?", [
+    const doDelete = async () => {
+      await deleteInvoice(invoice.id);
+      router.replace("/(tabs)/finance" as any);
+    };
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (window.confirm("Delete this invoice?")) {
+        void doDelete();
+      }
+      return;
+    }
+
+    Alert.alert("Delete Invoice", "Delete this invoice?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { await deleteInvoice(invoice.id); router.back(); } },
+      { text: "Delete", style: "destructive", onPress: () => { void doDelete(); } },
     ]);
   };
 
@@ -110,9 +143,14 @@ export default function InvoiceDetailScreen() {
               <Text style={[styles.paymentLabel, { color: "#92400E" }]}>Outstanding</Text>
               <Text style={[styles.paymentAmount, { color: "#92400E" }]}>£{outstanding.toFixed(2)}</Text>
             </View>
-            <TouchableOpacity style={[styles.payBtn, { backgroundColor: "#10B981" }]} onPress={() => setShowPaymentInput(!showPaymentInput)}>
-              <Text style={styles.payBtnText}>Record Payment</Text>
-            </TouchableOpacity>
+            <View style={styles.paymentActions}>
+              <TouchableOpacity style={[styles.payBtn, { backgroundColor: "#10B981", opacity: savingPayment ? 0.65 : 1 }]} onPress={markPaid} disabled={savingPayment}>
+                <Text style={styles.payBtnText}>Mark Paid</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.payBtn, { backgroundColor: "#92400E" }]} onPress={() => setShowPaymentInput(!showPaymentInput)} disabled={savingPayment}>
+                <Text style={styles.payBtnText}>Part Pay</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -125,7 +163,7 @@ export default function InvoiceDetailScreen() {
               value={paymentAmount} onChangeText={setPaymentAmount}
               keyboardType="decimal-pad" autoFocus
             />
-            <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: "#10B981" }]} onPress={recordPayment}>
+            <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: "#10B981", opacity: savingPayment ? 0.65 : 1 }]} onPress={recordPayment} disabled={savingPayment}>
               <Feather name="check" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -187,7 +225,8 @@ const styles = StyleSheet.create({
   paymentBanner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderRadius: 14, borderWidth: 1 },
   paymentLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
   paymentAmount: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  payBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
+  paymentActions: { flexDirection: "row", gap: 8 },
+  payBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
   payBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
   paymentInput: { flexDirection: "row", gap: 10, padding: 12, borderRadius: 14, borderWidth: 1 },
   amtInput: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, fontFamily: "Inter_400Regular" },

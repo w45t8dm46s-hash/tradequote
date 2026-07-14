@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { InvoiceCard } from "@/components/InvoiceCard";
@@ -21,7 +21,7 @@ export default function FinanceScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { invoices } = useInvoices();
-  const { expenses } = useExpenses();
+  const { expenses, deleteExpense } = useExpenses();
   const [tab, setTab] = useState<Tab>("invoices");
   const isWeb = Platform.OS === "web";
   const topPadding = isWeb ? 67 : insets.top;
@@ -35,6 +35,24 @@ export default function FinanceScreen() {
   }, [invoices, expenses]);
 
   const bottomPad = isWeb ? 34 : insets.bottom + 100;
+
+  const handleDeleteExpense = (id: string) => {
+    const doDelete = async () => {
+      await deleteExpense(id);
+    };
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (window.confirm("Delete this expense?")) {
+        void doDelete();
+      }
+      return;
+    }
+
+    Alert.alert("Delete Expense", "Delete this expense?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => { void doDelete(); } },
+    ]);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -110,7 +128,12 @@ export default function FinanceScreen() {
                     {exp.category} · {new Date(exp.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                   </Text>
                 </View>
-                <Text style={[styles.expenseAmount, { color: "#EF4444" }]}>-£{exp.amount.toFixed(2)}</Text>
+                <View style={styles.expenseRight}>
+                  <Text style={[styles.expenseAmount, { color: "#EF4444" }]}>-£{exp.amount.toFixed(2)}</Text>
+                  <TouchableOpacity style={[styles.deleteExpenseBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={() => handleDeleteExpense(exp.id)} activeOpacity={0.85}>
+                    <Feather name="trash-2" size={14} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -142,5 +165,7 @@ const styles = StyleSheet.create({
   expenseInfo: { flex: 1 },
   expenseDesc: { fontSize: 14, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
   expenseMeta: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  expenseRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   expenseAmount: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  deleteExpenseBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });
