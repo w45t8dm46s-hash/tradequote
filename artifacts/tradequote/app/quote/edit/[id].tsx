@@ -12,6 +12,20 @@ function toNum(s: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const UNIT_OPTIONS = [
+  "item",
+  "each",
+  "hours",
+  "days",
+  "metres",
+  "m²",
+  "rooms",
+  "points",
+  "fittings",
+  "sets",
+  "packs",
+];
+
 export default function EditQuoteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -21,6 +35,7 @@ export default function EditQuoteScreen() {
   const original = getQuote(id);
   const [draft, setDraft] = useState<Quote | null>(original ?? null);
   const [error, setError] = useState("");
+  const [openUnitPicker, setOpenUnitPicker] = useState<number | null>(null);
 
   if (!draft || !original) {
     return (
@@ -141,7 +156,33 @@ export default function EditQuoteScreen() {
               </View>
               <View style={{ flex: 1.2 }}>
                 <Text style={styles.smallLabel}>Unit</Text>
-                <TextInput style={styles.input} value={item.unit} onChangeText={(v) => updateItem(idx, { unit: v })} placeholder="hours" placeholderTextColor="#9CA3AF" />
+                <Pressable
+                  style={[styles.input, styles.unitPicker]}
+                  onPress={() => setOpenUnitPicker(openUnitPicker === idx ? null : idx)}
+                >
+                  <Text style={styles.unitPickerText}>{item.unit || "item"}</Text>
+                  <Feather name={openUnitPicker === idx ? "chevron-up" : "chevron-down"} size={14} color="#6B7280" />
+                </Pressable>
+
+                {openUnitPicker === idx && (
+                  <View style={styles.unitOptions}>
+                    {UNIT_OPTIONS.map((unit) => {
+                      const active = item.unit === unit;
+                      return (
+                        <Pressable
+                          key={unit}
+                          style={[styles.unitOption, active && styles.unitOptionActive]}
+                          onPress={() => {
+                            updateItem(idx, { unit });
+                            setOpenUnitPicker(null);
+                          }}
+                        >
+                          <Text style={[styles.unitOptionText, active && styles.unitOptionTextActive]}>{unit}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
               <View style={{ flex: 1.3 }}>
                 <Text style={styles.smallLabel}>Rate (£)</Text>
@@ -216,6 +257,13 @@ const styles = StyleSheet.create({
   smallLabel: { fontSize: 11, color: "#6B7280", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
   input: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 10 : 8, fontSize: 14, color: "#111", backgroundColor: "#fff" },
   multi: { minHeight: 56, textAlignVertical: "top" },
+  unitPicker: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 38 },
+  unitPickerText: { color: "#111", fontSize: 14 },
+  unitOptions: { marginTop: 6, borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, backgroundColor: "#fff", overflow: "hidden" },
+  unitOption: { paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
+  unitOptionActive: { backgroundColor: "#FFF1E8" },
+  unitOptionText: { color: "#111", fontSize: 13 },
+  unitOptionTextActive: { color: "#FF6B35", fontWeight: "700" },
   readonly: { backgroundColor: "#F3F4F6", justifyContent: "center", minHeight: 38 },
   readonlyText: { color: "#111", fontWeight: "600", fontSize: 14 },
   itemBlock: { borderTopWidth: 1, borderTopColor: "#F3F4F6", paddingTop: 12, gap: 10 },
