@@ -23,16 +23,30 @@ export default function NewExpenseScreen() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    if (!description.trim() || !amount) { setError("Description and amount are required."); return; }
-    const expense: Expense = {
-      id: genId(), description: description.trim(), amount: parseFloat(amount) || 0,
-      category, date, notes, createdAt: new Date().toISOString(),
-    };
-    await addExpense(expense);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    if (saving) return;
+    if (!description.trim() || !amount) {
+      setError("Description and amount are required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      const expense: Expense = {
+        id: genId(), description: description.trim(), amount: parseFloat(amount) || 0,
+        category, date, notes, createdAt: new Date().toISOString(),
+      };
+      await addExpense(expense);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      router.replace("/(tabs)/finance" as any);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to save expense.");
+      setSaving(false);
+    }
   };
 
   return (
@@ -96,9 +110,9 @@ export default function NewExpenseScreen() {
             value={notes} onChangeText={setNotes} multiline numberOfLines={3} textAlignVertical="top" />
         </View>
 
-        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={save} activeOpacity={0.85}>
+        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary, opacity: saving ? 0.65 : 1 }]} onPress={save} disabled={saving} activeOpacity={0.85}>
           <Feather name="plus-circle" size={18} color="#fff" />
-          <Text style={styles.btnText}>Save Expense</Text>
+          <Text style={styles.btnText}>{saving ? "Saving..." : "Save Expense"}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

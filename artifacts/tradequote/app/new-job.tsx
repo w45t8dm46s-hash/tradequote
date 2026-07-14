@@ -61,6 +61,8 @@ export default function NewJobScreen() {
   const [newMaterial, setNewMaterial] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [showQuotePicker, setShowQuotePicker] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const selectedQuote = quoteId ? quotes.find((q) => q.id === quoteId) : undefined;
 
   useEffect(() => {
@@ -99,27 +101,40 @@ export default function NewJobScreen() {
   const toggleOrdered = (id: string) => setMaterials((p) => p.map((m) => m.id === id ? { ...m, ordered: !m.ordered } : m));
 
   const save = async () => {
-    if (!customerName.trim()) return;
-    const job: Job = {
-      id: genId(),
-      customerId,
-      customerName: customerName.trim(),
-      quoteId: quoteId || undefined,
-      title: `${selectedType.label} job`,
-      jobType,
-      jobTypeLabel: selectedType.label,
-      status: "scheduled",
-      scheduledDate,
-      scheduledTime,
-      durationDays: Math.max(1, durationDays),
-      address,
-      notes,
-      materials,
-      createdAt: new Date().toISOString(),
-    };
-    await addJob(job);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.replace("/(tabs)/schedule" as any);
+    if (saving) return;
+    if (!customerName.trim()) {
+      setError("Customer name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      const job: Job = {
+        id: genId(),
+        customerId,
+        customerName: customerName.trim(),
+        quoteId: quoteId || undefined,
+        title: `${selectedType.label} job`,
+        jobType,
+        jobTypeLabel: selectedType.label,
+        status: "scheduled",
+        scheduledDate,
+        scheduledTime,
+        durationDays: Math.max(1, durationDays),
+        address,
+        notes,
+        materials,
+        createdAt: new Date().toISOString(),
+      };
+      await addJob(job);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      router.replace("/(tabs)/schedule" as any);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to schedule job.");
+      setSaving(false);
+    }
   };
 
   return (
@@ -130,6 +145,7 @@ export default function NewJobScreen() {
         showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.title, { color: colors.text }]}>Schedule Job</Text>
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.label, { color: colors.text }]}>Customer *</Text>
@@ -280,9 +296,9 @@ export default function NewJobScreen() {
             value={notes} onChangeText={setNotes} multiline numberOfLines={3} textAlignVertical="top" />
         </View>
 
-        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={save} activeOpacity={0.85}>
+        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary, opacity: saving ? 0.65 : 1 }]} onPress={save} disabled={saving} activeOpacity={0.85}>
           <Feather name="calendar" size={18} color="#fff" />
-          <Text style={styles.btnText}>Schedule Job</Text>
+          <Text style={styles.btnText}>{saving ? "Scheduling..." : "Schedule Job"}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -313,4 +329,5 @@ const styles = StyleSheet.create({
   btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, borderRadius: 14, gap: 8, marginTop: 4 },
   btnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
   tipText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  errorText: { color: "#EF4444", fontSize: 13, fontFamily: "Inter_400Regular" },
 });

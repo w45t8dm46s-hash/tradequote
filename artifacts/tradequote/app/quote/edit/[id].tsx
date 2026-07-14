@@ -35,6 +35,7 @@ export default function EditQuoteScreen() {
   const original = getQuote(id);
   const [draft, setDraft] = useState<Quote | null>(original ?? null);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [openUnitPicker, setOpenUnitPicker] = useState<number | null>(null);
 
   if (!draft || !original) {
@@ -76,9 +77,12 @@ export default function EditQuoteScreen() {
   }, [draft.lineItems, draft.taxRate]);
 
   const handleSave = async () => {
+    if (saving) return;
     if (!draft.customerName.trim()) { setError("Customer name is required"); return; }
     if (draft.lineItems.length === 0) { setError("Add at least one line item"); return; }
     try {
+      setSaving(true);
+      setError("");
       await updateQuote(draft.id, {
         customerName: draft.customerName,
         customerAddress: draft.customerAddress,
@@ -94,6 +98,7 @@ export default function EditQuoteScreen() {
       router.replace("/(tabs)/quotes" as any);
     } catch (e: any) {
       setError(e?.message || "Failed to save");
+      setSaving(false);
     }
   };
 
@@ -229,9 +234,9 @@ export default function EditQuoteScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Pressable style={styles.saveBtn} onPress={handleSave}>
+      <Pressable style={[styles.saveBtn, saving && { opacity: 0.65 }]} onPress={handleSave} disabled={saving}>
         <Feather name="check" size={16} color="#fff" />
-        <Text style={styles.saveBtnText}>Save changes</Text>
+        <Text style={styles.saveBtnText}>{saving ? "Saving..." : "Save changes"}</Text>
       </Pressable>
     </ScrollView>
       <BottomNav />
