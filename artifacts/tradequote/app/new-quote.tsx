@@ -275,7 +275,7 @@ export default function NewQuoteScreen() {
       taxAmount,
       total,
       professionalSummary: `Manual quote for ${selectedType?.label ?? jobType}. Review and edit pricing before sending to the customer.`,
-      customerSummary: "Thank you for your enquiry. Please review the quote details below.",
+      customerSummary: description.trim(),
       validDays: 30,
       quoteNumber: generateQuoteNumber(),
     };
