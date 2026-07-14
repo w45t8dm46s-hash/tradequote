@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React from "react";
-import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { InvoiceCard } from "@/components/InvoiceCard";
@@ -17,13 +17,21 @@ import BottomNav from "@/components/BottomNav";
 
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getCustomer, deleteCustomer } = useCustomers();
+  const { getCustomer, updateCustomer, deleteCustomer } = useCustomers();
   const { quotes } = useQuotes();
   const { invoices } = useInvoices();
   const { jobs } = useJobs();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [error, setError] = useState("");
 
   const customer = getCustomer(id);
   const customerQuotes = quotes.filter((q) => q.customerId === id);
@@ -44,14 +52,60 @@ export default function CustomerDetailScreen() {
   const initials = customer.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   const totalRevenue = customerInvoices.filter((i) => i.status === "paid").reduce((s, i) => s + i.paidAmount, 0);
 
+  const startEditing = () => {
+    setEditName(customer.name);
+    setEditPhone(customer.phone ?? "");
+    setEditEmail(customer.email ?? "");
+    setEditAddress(customer.address ?? "");
+    setEditNotes(customer.notes ?? "");
+    setError("");
+    setIsEditing(true);
+  };
+
+  const saveEdits = async () => {
+    if (saving) return;
+    if (!editName.trim()) {
+      setError("Customer name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await updateCustomer(customer.id, {
+        name: editName.trim(),
+        phone: editPhone.trim(),
+        email: editEmail.trim(),
+        address: editAddress.trim(),
+        notes: editNotes.trim(),
+      });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setIsEditing(false);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to update customer.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = () => {
+    const doDelete = async () => {
+      await deleteCustomer(customer.id);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      router.replace("/(tabs)/customers" as any);
+    };
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (window.confirm("Delete this customer? Their quotes and invoices will remain.")) {
+        void doDelete();
+      }
+      return;
+    }
+
     Alert.alert("Delete Customer", "Remove this customer? Their quotes and invoices will remain.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-        await deleteCustomer(customer.id);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.back();
-      }},
+      { text: "Delete", style: "destructive", onPress: () => { void doDelete(); } },
     ]);
   };
 
@@ -65,10 +119,38 @@ export default function CustomerDetailScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Feather name="arrow-left" size={20} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={handleDelete}>
-            <Feather name="trash-2" size={18} color="#EF4444" />
-          </TouchableOpacity>
+          <View style={styles.topActions}>
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={startEditing}>
+              <Feather name="edit-2" size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={handleDelete}>
+              <Feather name="trash-2" size={18} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {isEditing && (
+          <View style={[styles.editCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>EDIT CUSTOMER</Text>
+            {!!error && <Text style={styles.errorText}>{error}</Text>}
+
+            <TextInput style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]} value={editName} onChangeText={setEditName} placeholder="Name" placeholderTextColor={colors.mutedForeground} />
+            <TextInput style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]} value={editPhone} onChangeText={setEditPhone} placeholder="Phone" placeholderTextColor={colors.mutedForeground} />
+            <TextInput style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]} value={editEmail} onChangeText={setEditEmail} placeholder="Email" placeholderTextColor={colors.mutedForeground} />
+            <TextInput style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]} value={editAddress} onChangeText={setEditAddress} placeholder="Address" placeholderTextColor={colors.mutedForeground} />
+            <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]} value={editNotes} onChangeText={setEditNotes} placeholder="Notes" placeholderTextColor={colors.mutedForeground} multiline />
+
+            <View style={styles.editActions}>
+              <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={() => setIsEditing(false)} disabled={saving}>
+                <Text style={[styles.cancelBtnText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.65 : 1 }]} onPress={saveEdits} disabled={saving}>
+                <Feather name="check" size={16} color="#fff" />
+                <Text style={styles.saveBtnText}>{saving ? "Saving..." : "Save changes"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <View style={styles.heroSection}>
           <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
@@ -153,6 +235,7 @@ const styles = StyleSheet.create({
   link: { fontSize: 15, fontFamily: "Inter_500Medium" },
   scroll: { padding: 16, gap: 16 },
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  topActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   heroSection: { alignItems: "center", gap: 8, paddingVertical: 8 },
   avatar: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
@@ -171,6 +254,15 @@ const styles = StyleSheet.create({
   actionBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   notesBox: { padding: 14, borderRadius: 14, borderWidth: 1, gap: 6 },
   notesText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  editCard: { padding: 14, borderRadius: 14, borderWidth: 1, gap: 10 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular" },
+  textArea: { minHeight: 80, textAlignVertical: "top" },
+  editActions: { flexDirection: "row", gap: 10 },
+  cancelBtn: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  cancelBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  saveBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, paddingVertical: 12 },
+  saveBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  errorText: { color: "#EF4444", fontSize: 13, fontFamily: "Inter_400Regular" },
   section: { gap: 8 },
   sectionTitle: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
 });
