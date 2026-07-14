@@ -63,6 +63,8 @@ export default function NewQuoteScreen() {
   const [photos, setPhotos] = useState<PhotoAsset[]>([]);
   const [generatedQuote, setGeneratedQuote] = useState<Quote | null>(null);
   const [error, setError] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
+  const [quoteSaving, setQuoteSaving] = useState(false);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
 
   const currentTrade = getTradeById(settings.trade) ?? TRADES[0];
@@ -190,6 +192,7 @@ export default function NewQuoteScreen() {
 
 
   const createManualQuote = async () => {
+    if (manualSaving) return;
     if (!customerName.trim() || !description.trim()) {
       setError("Please enter at least a customer name and job description.");
       return;
@@ -234,38 +237,48 @@ export default function NewQuoteScreen() {
     };
 
     try {
+      setManualSaving(true);
       setError("");
       await addQuote(quote);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       router.push(`/quote/edit/${quote.id}`);
     } catch (e: any) {
       setError(e?.message ?? "Failed to create manual quote.");
+      setManualSaving(false);
     }
   };
 
   const saveQuote = async () => {
+    if (quoteSaving) return;
     if (!generatedQuote) return;
     try {
+      setQuoteSaving(true);
+      setError("");
       await addQuote(generatedQuote);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setError(e?.message ?? "Failed to save quote.");
+      setQuoteSaving(false);
     }
   };
 
   const updateStatus = async (status: Quote["status"]) => {
+    if (quoteSaving) return;
     if (!generatedQuote) return;
     const updated = { ...generatedQuote, status };
     setGeneratedQuote(updated);
     try {
+      setQuoteSaving(true);
+      setError("");
       await addQuote(updated);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       router.back();
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setError(e?.message ?? "Failed to save quote.");
+      setQuoteSaving(false);
     }
   };
 
@@ -452,9 +465,9 @@ export default function NewQuoteScreen() {
                 style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
                 onPress={createManualQuote}
                 activeOpacity={0.85}
-              >
+               disabled={manualSaving}>
                 <Feather name="edit-3" size={18} color="#fff" />
-                <Text style={[styles.primaryBtnText, { color: "#fff" }]}>Create Manual Quote</Text>
+                <Text style={[styles.primaryBtnText, { color: "#fff" }]}>{manualSaving ? "Creating..." : "Create Manual Quote"}</Text>
               </TouchableOpacity>
 
         </KeyboardAwareScrollView>

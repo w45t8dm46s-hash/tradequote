@@ -31,6 +31,8 @@ export default function NewInvoiceScreen() {
   const [daysUntilDue, setDaysUntilDue] = useState("30");
   const [depositAmount, setDepositAmount] = useState("0");
   const [quoteId, setQuoteId] = useState(params.quoteId ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { description: "", quantity: 1, unit: "hrs", rate: 0, total: 0 },
   ]);
@@ -71,19 +73,32 @@ export default function NewInvoiceScreen() {
   const total = subtotal + taxAmount;
 
   const save = async () => {
-    if (!customerName.trim()) return;
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + parseInt(daysUntilDue) || 30);
-    const dep = parseFloat(depositAmount) || 0;
-    const invoice: Invoice = {
-      id: genId(), invoiceNumber: genInvNum(), customerId, customerName, customerAddress,
-      quoteId: quoteId || undefined, lineItems, subtotal, taxRate: 20, taxAmount, total,
-      status: "draft", dueDate: dueDate.toISOString(), createdAt: new Date().toISOString(),
-      paidAmount: dep, depositAmount: dep, notes,
-    };
-    await addInvoice(invoice);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.replace("/(tabs)/finance" as any);
+    if (saving) return;
+    if (!customerName.trim()) {
+      setError("Customer name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + (parseInt(daysUntilDue, 10) || 30));
+      const dep = parseFloat(depositAmount) || 0;
+      const invoice: Invoice = {
+        id: genId(), invoiceNumber: genInvNum(), customerId, customerName, customerAddress,
+        quoteId: quoteId || undefined, lineItems, subtotal, taxRate: 20, taxAmount, total,
+        status: "draft", dueDate: dueDate.toISOString(), createdAt: new Date().toISOString(),
+        paidAmount: dep, depositAmount: dep, notes,
+      };
+      await addInvoice(invoice);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      router.replace("/(tabs)/finance" as any);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to create invoice.");
+      setSaving(false);
+    }
   };
 
   return (
@@ -94,6 +109,7 @@ export default function NewInvoiceScreen() {
         bottomOffset={16} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.title, { color: colors.text }]}>New Invoice</Text>
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.label, { color: colors.text }]}>Customer Name *</Text>
@@ -175,9 +191,9 @@ export default function NewInvoiceScreen() {
             value={notes} onChangeText={setNotes} multiline numberOfLines={3} textAlignVertical="top" />
         </View>
 
-        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={save} activeOpacity={0.85}>
+        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary, opacity: saving ? 0.65 : 1 }]} onPress={save} disabled={saving} activeOpacity={0.85}>
           <Feather name="file-plus" size={18} color="#fff" />
-          <Text style={styles.btnText}>Create Invoice</Text>
+          <Text style={styles.btnText}>{saving ? "Saving..." : "Create Invoice"}</Text>
         </TouchableOpacity>
       </KeyboardAwareScrollView>
     </View>
@@ -211,4 +227,5 @@ const styles = StyleSheet.create({
   grandVal: { fontSize: 20, fontFamily: "Inter_700Bold" },
   btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, borderRadius: 14, gap: 8, marginTop: 4 },
   btnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  errorText: { color: "#EF4444", fontSize: 13, fontFamily: "Inter_400Regular" },
 });
