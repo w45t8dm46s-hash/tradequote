@@ -186,8 +186,16 @@ export default function NewQuoteScreen() {
     } catch (e: any) {
       console.error(e);
       setStep("details");
-      const msg = e?.message ? `Failed to generate quote: ${e.message}` : "Failed to generate quote. Please check your connection and try again.";
-      setError(msg);
+      const rawMsg = String(e?.message ?? "");
+      const aiKeyProblem = rawMsg.toLowerCase().includes("api-key") || rawMsg.toLowerCase().includes("x-api-key");
+
+      if (aiKeyProblem) {
+        await updateSettings({ aiAssistanceEnabled: false });
+        setError("AI is not configured yet, so it has been switched off. You can still create a manual quote.");
+      } else {
+        const msg = rawMsg ? `Failed to generate quote: ${rawMsg}` : "Failed to generate quote. Please check your connection and try again.";
+        setError(msg);
+      }
     }
   };
 
@@ -228,7 +236,15 @@ export default function NewQuoteScreen() {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
     } catch (e: any) {
-      setError(e?.message ?? "Failed to improve wording.");
+      const rawMsg = String(e?.message ?? "");
+      const aiKeyProblem = rawMsg.toLowerCase().includes("api-key") || rawMsg.toLowerCase().includes("x-api-key");
+
+      if (aiKeyProblem) {
+        await updateSettings({ aiAssistanceEnabled: false });
+        setError("AI is not configured yet, so it has been switched off. You can still create a manual quote.");
+      } else {
+        setError(rawMsg || "Failed to improve wording.");
+      }
     } finally {
       setImprovingDescription(false);
     }

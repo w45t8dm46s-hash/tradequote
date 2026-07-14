@@ -137,7 +137,15 @@ export default function EditQuoteScreen() {
         setDraft({ ...draft, customerSummary: String(data.improvedText).trim() });
       }
     } catch (e: any) {
-      setError(e?.message || "Failed to improve wording.");
+      const rawMsg = String(e?.message ?? "");
+      const aiKeyProblem = rawMsg.toLowerCase().includes("api-key") || rawMsg.toLowerCase().includes("x-api-key");
+
+      if (aiKeyProblem) {
+        await updateSettings({ aiAssistanceEnabled: false });
+        setError("AI is not configured yet, so it has been switched off. You can continue manually.");
+      } else {
+        setError(rawMsg || "Failed to improve wording.");
+      }
     } finally {
       setImprovingScope(false);
     }
