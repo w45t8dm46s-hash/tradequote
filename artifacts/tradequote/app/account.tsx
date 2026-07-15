@@ -209,7 +209,7 @@ export default function AccountScreen() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Business settings</Text>
-            <Text style={styles.smallMuted}>Set your branding, hourly labour rate and VAT details — these are used on quote PDFs and to guide AI-generated pricing.</Text>
+            <Text style={styles.smallMuted}>Set your branding, hourly labour rate and VAT details — these are used on quote and invoice PDFs.</Text>
             <Pressable style={styles.outlineBtn} onPress={() => router.push("/settings")}>
               <Feather name="settings" size={16} color="#111" />
               <Text style={styles.outlineBtnText}>Open settings</Text>

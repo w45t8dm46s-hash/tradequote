@@ -16,6 +16,10 @@ export function getApiBaseUrl(): string {
   // NOTE: this WILL break if the webapp and API are on different origins.
   // Always set EXPO_PUBLIC_API_URL in production to avoid this.
   if (typeof window !== "undefined" && window.location?.origin) {
+    const host = window.location.hostname;
+    if (host === "quoteforge.uk" || host === "www.quoteforge.uk") {
+      return "https://quoteforge-api-9fzw.onrender.com";
+    }
     return window.location.origin;
   }
 
