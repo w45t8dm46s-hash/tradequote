@@ -25,7 +25,7 @@ router.post("/ai/improve-wording", requireAuth, async (req: AuthedRequest, res) 
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
 
     if (!apiKey) {
-      return res.status(503).json({ error: "AI wording is not configured yet." });
+      return res.status(503).json({ error: "AI wording is not configured yet. Set ANTHROPIC_API_KEY on QuoteForge.api." });
     }
 
     const prompt = [

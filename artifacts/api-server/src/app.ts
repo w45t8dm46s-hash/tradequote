@@ -61,6 +61,10 @@ app.post(
 // Restrict CORS to trusted origins only. In dev we allow the Replit dev/expo
 // domains; in production we allow the deployed REPLIT_DOMAINS.
 const allowedOrigins = new Set<string>();
+allowedOrigins.add("https://quoteforge.uk");
+allowedOrigins.add("https://www.quoteforge.uk");
+allowedOrigins.add("https://quoteforge-webapp.onrender.com");
+
 // Explicit list for Render / custom deployments (comma-separated URLs or hostnames)
 for (const entry of (process.env.ALLOWED_ORIGINS?.split(",") ?? [])) {
   const trimmed = entry.trim();

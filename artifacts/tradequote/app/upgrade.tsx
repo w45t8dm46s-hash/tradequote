@@ -28,10 +28,15 @@ export default function UpgradeScreen() {
       try {
         const baseUrl = getBaseUrl();
         const resp = await fetch(`${baseUrl}/api/stripe/price`);
-        const data = await resp.json();
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || !data.price) {
+          throw new Error(data.error || "Could not load Stripe price.");
+        }
+
         setPrice(data.price);
-      } catch (e) {
-        setError("Could not load pricing");
+      } catch (e: any) {
+        setError(e?.message || "Could not load pricing");
       } finally {
         setLoadingPrice(false);
       }
@@ -45,7 +50,7 @@ export default function UpgradeScreen() {
     try {
       const token = await getToken();
       const baseUrl = getBaseUrl();
-      const returnUrl = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+      const returnUrl = typeof window !== "undefined" ? window.location.origin : "https://quoteforge.uk";
       const resp = await fetch(`${baseUrl}/api/stripe/checkout`, {
         method: "POST",
         headers: {
@@ -105,14 +110,18 @@ export default function UpgradeScreen() {
         onPress={startCheckout}
         disabled={loadingPrice || checkingOut || !price}
       >
-        {checkingOut || loadingPrice ? (
+        {checkingOut ? (
           <ActivityIndicator color="#fff" />
+        ) : loadingPrice ? (
+          <Text style={styles.buttonText}>Loading price...</Text>
+        ) : price ? (
+          <Text style={styles.buttonText}>{`Subscribe — ${priceLabel}`}</Text>
         ) : (
-          <Text style={styles.buttonText}>{price ? `Subscribe — ${priceLabel}` : "Loading..."}</Text>
+          <Text style={styles.buttonText}>Stripe unavailable</Text>
         )}
       </Pressable>
 
-      <Text style={styles.disclaimer}>You'll be redirected to Stripe to complete payment securely.</Text>
+      <Text style={styles.disclaimer}>You'll be redirected to Stripe to complete payment securely. Terms, privacy and cancellation details should be reviewed before launch.</Text>
     </ScrollView>
   );
 }

@@ -6,9 +6,42 @@ import { getUncachableStripeClient } from "../lib/stripeClient";
 
 const router = Router();
 
+function getConfiguredPriceId(): string | null {
+  return (
+    process.env.STRIPE_PRICE_ID ||
+    process.env.STRIPE_PRO_PRICE_ID ||
+    process.env.QUOTEFORGE_PRICE_ID ||
+    null
+  );
+}
+
+async function getConfiguredStripePrice() {
+  const priceId = getConfiguredPriceId();
+  if (!priceId) return null;
+
+  const stripe = await getUncachableStripeClient();
+  const price = await stripe.prices.retrieve(priceId, { expand: ["product"] });
+  const product: any = price.product;
+
+  return {
+    id: price.id,
+    unit_amount: price.unit_amount ?? 0,
+    currency: price.currency,
+    recurring: price.recurring,
+    productName: typeof product === "object" && product?.name ? product.name : "QuoteForge Pro",
+  };
+}
+
+
+
 // Return the QuoteForge Pro price (the single subscription product).
 router.get("/stripe/price", async (_req, res) => {
   try {
+    const configured = await getConfiguredStripePrice();
+    if (configured) {
+      return res.json({ price: configured });
+    }
+
     const result = await db.execute(sql`
       SELECT pr.id, pr.unit_amount, pr.currency, pr.recurring, p.name
       FROM stripe.prices pr
@@ -17,9 +50,15 @@ router.get("/stripe/price", async (_req, res) => {
       ORDER BY pr.unit_amount ASC
       LIMIT 1
     `);
+
     const row = result.rows[0];
-    if (!row) return res.json({ price: null });
-    res.json({
+    if (!row) {
+      return res.status(503).json({
+        error: "Stripe price is not configured. Set STRIPE_PRICE_ID on QuoteForge.api.",
+      });
+    }
+
+    return res.json({
       price: {
         id: row.id,
         unit_amount: row.unit_amount,
@@ -30,7 +69,7 @@ router.get("/stripe/price", async (_req, res) => {
     });
   } catch (err: any) {
     console.error("List price error:", err);
-    res.status(500).json({ error: "Failed to load price" });
+    res.status(500).json({ error: err.message || "Failed to load price" });
   }
 });
 
@@ -41,9 +80,10 @@ router.post("/stripe/checkout", requireAuth, async (req, res) => {
     const { priceId, returnUrl } = req.body as { priceId?: string; returnUrl?: string };
     if (!priceId) return res.status(400).json({ error: "priceId required" });
 
-    // Server-side allowlist: only accept currently-active QuoteForge prices.
-    const allowed = await getActiveProPriceIds();
-    if (!allowed.includes(priceId)) {
+    // Server-side allowlist: accept the configured live price ID, plus any active synced prices.
+    const configuredPriceId = getConfiguredPriceId();
+    const allowed = await getActiveProPriceIds().catch(() => []);
+    if (priceId !== configuredPriceId && !allowed.includes(priceId)) {
       return res.status(400).json({ error: "Invalid priceId" });
     }
 
