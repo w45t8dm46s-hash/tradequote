@@ -9,7 +9,9 @@ import { type QuoteStatus, useQuotes } from "@/context/QuotesContext";
 import { useSettings } from "@/context/SettingsContext";
 import { printQuote } from "@/lib/quotePdf";
 import { useColors } from "@/hooks/useColors";
+import { usePlan } from "@/hooks/usePlan";
 import BottomNav from "@/components/BottomNav";
+import UpgradePrompt from "@/components/UpgradePrompt";
 
 const STATUS_OPTIONS: { value: QuoteStatus; label: string; icon: string; color: string }[] = [
   { value: "draft", label: "Draft", icon: "file", color: "#6B7280" },
@@ -25,6 +27,8 @@ export default function QuoteDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
+  const { isPro } = usePlan();
+  const [upgradeFeature, setUpgradeFeature] = useState("");
 
   const quote = getQuote(id);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
@@ -42,6 +46,16 @@ export default function QuoteDetailScreen() {
   }
 
   const currentStatus = STATUS_OPTIONS.find((s) => s.value === quote.status) ?? STATUS_OPTIONS[0];
+
+
+  const handleDownloadPdf = () => {
+    if (!isPro) {
+      setUpgradeFeature("Quote PDF downloads");
+      return;
+    }
+
+    void printQuote(quote, settings);
+  };
 
   const handleShare = async () => {
     const lineItemsText = quote.lineItems
@@ -86,7 +100,7 @@ export default function QuoteDetailScreen() {
             >
               <Feather name="edit-2" size={18} color={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => printQuote(quote, settings)}>
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleDownloadPdf}>
               <Feather name="printer" size={18} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleShare}>
@@ -192,7 +206,7 @@ export default function QuoteDetailScreen() {
             <Feather name="edit-2" size={16} color={colors.text} />
             <Text style={[styles.actionBtnText, { color: colors.text }]}>Edit Quote</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]} onPress={() => printQuote(quote, settings)} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]} onPress={handleDownloadPdf} activeOpacity={0.85}>
             <Feather name="download" size={16} color={colors.text} />
             <Text style={[styles.actionBtnText, { color: colors.text }]}>Download PDF</Text>
           </TouchableOpacity>
@@ -220,6 +234,11 @@ export default function QuoteDetailScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      <UpgradePrompt
+        visible={!!upgradeFeature}
+        featureName={upgradeFeature || "This feature"}
+        onClose={() => setUpgradeFeature("")}
+      />
       <BottomNav />
     </View>
   );

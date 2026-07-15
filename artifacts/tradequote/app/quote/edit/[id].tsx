@@ -7,7 +7,9 @@ import { useAuth } from "@clerk/expo";
 import { type LineItem, type Quote, useQuotes } from "@/context/QuotesContext";
 import { useSettings } from "@/context/SettingsContext";
 import BottomNav from "@/components/BottomNav";
+import UpgradePrompt from "@/components/UpgradePrompt";
 import { getApiBaseUrl } from "@/lib/api";
+import { usePlan } from "@/hooks/usePlan";
 
 function toNum(s: string): number {
   const n = Number(String(s).replace(/[^\d.\-]/g, ""));
@@ -56,6 +58,7 @@ export default function EditQuoteScreen() {
   const { getQuote, updateQuote } = useQuotes();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
+  const { isPro } = usePlan();
 
   const original = getQuote(id);
   const [draft, setDraft] = useState<Quote | null>(() => getInitialDraft(original));
@@ -63,6 +66,7 @@ export default function EditQuoteScreen() {
   const [saving, setSaving] = useState(false);
   const [openUnitPicker, setOpenUnitPicker] = useState<number | null>(null);
   const [improvingScope, setImprovingScope] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState("");
 
   if (!draft || !original) {
     return (
@@ -103,6 +107,11 @@ export default function EditQuoteScreen() {
   }, [draft.lineItems, draft.taxRate]);
 
   const improveScope = async () => {
+    if (!isPro) {
+      setUpgradeFeature("AI improve wording");
+      return;
+    }
+
     if (!settings.aiAssistanceEnabled || improvingScope || !draft) return;
 
     if (!draft.customerSummary.trim()) {
@@ -209,7 +218,13 @@ export default function EditQuoteScreen() {
                 <Text style={styles.aiTitle}>AI Assistance</Text>
                 <Text style={styles.aiHint}>Improves wording only. It will not price jobs or change totals.</Text>
               </View>
-              <Pressable style={[styles.aiToggle, { backgroundColor: settings.aiAssistanceEnabled ? "#FF6B35" : "#9CA3AF" }]} onPress={() => { void updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled }); }}>
+              <Pressable style={[styles.aiToggle, { backgroundColor: settings.aiAssistanceEnabled ? "#FF6B35" : "#9CA3AF" }]} onPress={() => {
+                if (!isPro && !settings.aiAssistanceEnabled) {
+                  setUpgradeFeature("AI Assistance");
+                  return;
+                }
+                void updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled });
+              }}>
                 <Text style={styles.aiToggleText}>{settings.aiAssistanceEnabled ? "On" : "Off"}</Text>
               </Pressable>
             </View>
@@ -334,6 +349,11 @@ export default function EditQuoteScreen() {
         <Text style={styles.saveBtnText}>{saving ? "Saving..." : "Save changes"}</Text>
       </Pressable>
     </ScrollView>
+      <UpgradePrompt
+        visible={!!upgradeFeature}
+        featureName={upgradeFeature || "This feature"}
+        onClose={() => setUpgradeFeature("")}
+      />
       <BottomNav />
     </>
   );

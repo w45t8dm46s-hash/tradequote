@@ -25,9 +25,11 @@ import { useCustomers } from "@/context/CustomersContext";
 import { type Quote, useQuotes } from "@/context/QuotesContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
+import { usePlan } from "@/hooks/usePlan";
 
 import { TRADES, getTradeById } from "@/lib/trades";
 import BottomNav from "@/components/BottomNav";
+import UpgradePrompt from "@/components/UpgradePrompt";
 
 type Step = "type" | "details" | "generating" | "preview";
 
@@ -49,6 +51,7 @@ export default function NewQuoteScreen() {
   const { customers } = useCustomers();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
+  const { isPro } = usePlan();
   const params = useLocalSearchParams<{ customerId?: string; customerName?: string; customerAddress?: string }>();
   const isWeb = Platform.OS === "web";
 
@@ -67,6 +70,7 @@ export default function NewQuoteScreen() {
   const [quoteSaving, setQuoteSaving] = useState(false);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [improvingDescription, setImprovingDescription] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState("");
 
   const currentTrade = getTradeById(settings.trade) ?? TRADES[0];
   const JOB_TYPES = currentTrade.jobTypes;
@@ -99,6 +103,11 @@ export default function NewQuoteScreen() {
   };
 
   const generateQuote = async () => {
+    if (!isPro) {
+      setUpgradeFeature("AI quote generation");
+      return;
+    }
+
     if (!customerName.trim() || !description.trim()) {
       setError("Please fill in customer name and job description.");
       return;
@@ -201,6 +210,11 @@ export default function NewQuoteScreen() {
 
 
   const improveDescription = async () => {
+    if (!isPro) {
+      setUpgradeFeature("AI improve wording");
+      return;
+    }
+
     if (!settings.aiAssistanceEnabled || improvingDescription) return;
 
     if (!description.trim()) {
@@ -407,7 +421,13 @@ export default function NewQuoteScreen() {
               </View>
               <TouchableOpacity
                 style={[styles.aiToggle, { backgroundColor: settings.aiAssistanceEnabled ? colors.primary : colors.muted }]}
-                onPress={() => { void updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled }); }}
+                onPress={() => {
+                  if (!isPro && !settings.aiAssistanceEnabled) {
+                    setUpgradeFeature("AI Assistance");
+                    return;
+                  }
+                  void updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled });
+                }}
                 activeOpacity={0.85}
               >
                 <Text style={styles.aiToggleText}>{settings.aiAssistanceEnabled ? "On" : "Off"}</Text>
@@ -641,6 +661,11 @@ export default function NewQuoteScreen() {
           </View>
         </ScrollView>
       )}
+      <UpgradePrompt
+        visible={!!upgradeFeature}
+        featureName={upgradeFeature || "This feature"}
+        onClose={() => setUpgradeFeature("")}
+      />
       <BottomNav />
     </View>
   );
