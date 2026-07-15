@@ -8,7 +8,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type InvoiceStatus, useInvoices } from "@/context/InvoicesContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
+import { usePlan } from "@/hooks/usePlan";
 import BottomNav from "@/components/BottomNav";
+import UpgradePrompt from "@/components/UpgradePrompt";
 import { printInvoice } from "@/lib/invoicePdf";
 
 const STATUS_OPTIONS: { value: InvoiceStatus; label: string; color: string }[] = [
@@ -26,6 +28,8 @@ export default function InvoiceDetailScreen() {
   const { settings } = useSettings();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
+  const { isPro } = usePlan();
+  const [upgradeFeature, setUpgradeFeature] = useState("");
 
   const invoice = getInvoice(id);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
@@ -45,6 +49,16 @@ export default function InvoiceDetailScreen() {
   const currentStatus = STATUS_OPTIONS.find((s) => s.value === invoice.status) ?? STATUS_OPTIONS[0];
   const outstanding = invoice.total - invoice.paidAmount;
   const dueDate = new Date(invoice.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+
+  const handleDownloadPdf = () => {
+    if (!isPro) {
+      setUpgradeFeature("Invoice PDF downloads");
+      return;
+    }
+
+    void printInvoice(invoice, settings);
+  };
 
   const recordPayment = async () => {
     if (savingPayment) return;
@@ -108,7 +122,7 @@ export default function InvoiceDetailScreen() {
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()}><Feather name="arrow-left" size={20} color={colors.text} /></TouchableOpacity>
           <View style={styles.topActions}>
-            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => printInvoice(invoice, settings)}>
+            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleDownloadPdf}>
               <Feather name="printer" size={18} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleShare}>
@@ -200,7 +214,7 @@ export default function InvoiceDetailScreen() {
           )}
         </View>
 
-        <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]} onPress={() => printInvoice(invoice, settings)} activeOpacity={0.85}>
+        <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]} onPress={handleDownloadPdf} activeOpacity={0.85}>
           <Feather name="download" size={18} color={colors.text} />
           <Text style={[styles.shareBtnText, { color: colors.text }]}>Download PDF</Text>
         </TouchableOpacity>
@@ -210,6 +224,11 @@ export default function InvoiceDetailScreen() {
           <Text style={styles.shareBtnText}>Share Invoice</Text>
         </TouchableOpacity>
       </ScrollView>
+      <UpgradePrompt
+        visible={!!upgradeFeature}
+        featureName={upgradeFeature || "This feature"}
+        onClose={() => setUpgradeFeature("")}
+      />
       <BottomNav />
     </View>
   );

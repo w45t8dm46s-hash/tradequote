@@ -87,14 +87,14 @@ export default function UpgradeScreen() {
       </View>
 
       <Text style={styles.title}>Upgrade to QuoteForge Pro</Text>
-      <Text style={styles.subtitle}>You've used your 5 free quotes. Go unlimited with Pro.</Text>
+      <Text style={styles.subtitle}>Unlock professional PDFs, AI wording support and advanced quote tools.</Text>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Pro</Text>
         <Text style={styles.cardPrice}>{priceLabel}</Text>
-        <View style={styles.featureRow}><Feather name="check" size={18} color="#22C55E" /><Text style={styles.feature}>Unlimited AI-generated quotes</Text></View>
-        <View style={styles.featureRow}><Feather name="check" size={18} color="#22C55E" /><Text style={styles.feature}>Photo analysis on every quote</Text></View>
-        <View style={styles.featureRow}><Feather name="check" size={18} color="#22C55E" /><Text style={styles.feature}>BS 7671 / Part P compliant outputs</Text></View>
+        <View style={styles.featureRow}><Feather name="check" size={18} color="#22C55E" /><Text style={styles.feature}>Professional quote and invoice PDFs</Text></View>
+        <View style={styles.featureRow}><Feather name="check" size={18} color="#22C55E" /><Text style={styles.feature}>AI wording support for quote scopes</Text></View>
+        <View style={styles.featureRow}><Feather name="check" size={18} color="#22C55E" /><Text style={styles.feature}>Advanced quote, invoice and job tools</Text></View>
         <View style={styles.featureRow}><Feather name="check" size={18} color="#22C55E" /><Text style={styles.feature}>Cancel anytime</Text></View>
       </View>
 
