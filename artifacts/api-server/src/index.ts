@@ -1,7 +1,6 @@
 import { runMigrations } from "stripe-replit-sync";
 import app from "./app";
 import { logger } from "./lib/logger";
-import { getStripeSync } from "./lib/stripeClient";
 
 const rawPort = process.env["PORT"];
 if (!rawPort) {

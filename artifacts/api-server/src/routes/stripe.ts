@@ -6,6 +6,35 @@ import { getUncachableStripeClient } from "../lib/stripeClient";
 
 const router = Router();
 
+function configuredPriceIds(): string[] {
+  return [
+    process.env.STRIPE_PRICE_ID,
+    process.env.STRIPE_PRO_PRICE_ID,
+    process.env.QUOTEFORGE_PRICE_ID,
+  ].filter(Boolean) as string[];
+}
+
+function subscriptionMatchesConfiguredPrice(subscription: any): boolean {
+  const configured = configuredPriceIds();
+  if (configured.length === 0) return true;
+  return Boolean(subscription?.items?.data?.some((item: any) => configured.includes(item?.price?.id)));
+}
+
+async function findActiveSubscription(stripe: any, customerId: string, requireCancelAtPeriodEnd = false) {
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+    expand: ["data.items.data.price"],
+  });
+
+  return subscriptions.data.find((subscription: any) =>
+    ["active", "trialing"].includes(subscription.status) &&
+    subscriptionMatchesConfiguredPrice(subscription) &&
+    (!requireCancelAtPeriodEnd || subscription.cancel_at_period_end === true)
+  );
+}
+
 function getConfiguredPriceId(): string | null {
   return (
     process.env.STRIPE_PRICE_ID ||
@@ -108,6 +137,9 @@ router.post("/stripe/checkout", requireAuth, async (req, res) => {
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
+      client_reference_id: userId,
+      metadata: { clerkUserId: userId },
+      subscription_data: { metadata: { clerkUserId: userId } },
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",

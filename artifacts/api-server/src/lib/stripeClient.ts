@@ -1,5 +1,4 @@
 import Stripe from "stripe";
-import { StripeSync } from "stripe-replit-sync";
 
 const STRIPE_API_VERSION = "2025-08-27.basil" as const;
 
@@ -22,13 +21,13 @@ export function getUncachableStripeClient(): Stripe {
   return new Stripe(getStripeSecretKey(), { apiVersion: STRIPE_API_VERSION });
 }
 
-export function getStripeSync(): StripeSync {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) throw new Error("DATABASE_URL is required");
-
-  return new StripeSync({
-    poolConfig: { connectionString: databaseUrl, max: 2 },
-    stripeSecretKey: getStripeSecretKey(),
-    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-  });
+export function getStripeWebhookSecret(): string {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error(
+      "STRIPE_WEBHOOK_SECRET environment variable is not set. " +
+      "Add the whsec_ value from your Stripe webhook destination in Render."
+    );
+  }
+  return secret;
 }
