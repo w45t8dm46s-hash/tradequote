@@ -58,7 +58,7 @@ export default function EditQuoteScreen() {
   const { getQuote, updateQuote } = useQuotes();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
-  const { isPro } = usePlan();
+  const { isPro, reload: reloadPlan } = usePlan();
 
   const original = getQuote(id);
   const [draft, setDraft] = useState<Quote | null>(() => getInitialDraft(original));
@@ -106,11 +106,18 @@ export default function EditQuoteScreen() {
     return { subtotal, taxAmount, total };
   }, [draft.lineItems, draft.taxRate]);
 
+  const ensurePro = async (featureName: string) => {
+    if (isPro) return true;
+
+    const refreshedIsPro = await reloadPlan();
+    if (refreshedIsPro) return true;
+
+    setUpgradeFeature(featureName);
+    return false;
+  };
+
   const improveScope = async () => {
-    if (!isPro) {
-      setUpgradeFeature("AI improve wording");
-      return;
-    }
+    if (!(await ensurePro("AI improve wording"))) return;
 
     if (!settings.aiAssistanceEnabled || improvingScope || !draft) return;
 
@@ -219,11 +226,10 @@ export default function EditQuoteScreen() {
                 <Text style={styles.aiHint}>Improves wording only. It will not price jobs or change totals.</Text>
               </View>
               <Pressable style={[styles.aiToggle, { backgroundColor: settings.aiAssistanceEnabled ? "#FF6B35" : "#9CA3AF" }]} onPress={() => {
-                if (!isPro && !settings.aiAssistanceEnabled) {
-                  setUpgradeFeature("AI Assistance");
-                  return;
-                }
-                void updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled });
+                void (async () => {
+                  if (!settings.aiAssistanceEnabled && !(await ensurePro("AI Assistance"))) return;
+                  await updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled });
+                })();
               }}>
                 <Text style={styles.aiToggleText}>{settings.aiAssistanceEnabled ? "On" : "Off"}</Text>
               </Pressable>

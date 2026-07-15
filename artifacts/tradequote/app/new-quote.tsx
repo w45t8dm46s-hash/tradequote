@@ -51,7 +51,7 @@ export default function NewQuoteScreen() {
   const { customers } = useCustomers();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
-  const { isPro } = usePlan();
+  const { isPro, reload: reloadPlan } = usePlan();
   const params = useLocalSearchParams<{ customerId?: string; customerName?: string; customerAddress?: string }>();
   const isWeb = Platform.OS === "web";
 
@@ -102,11 +102,18 @@ export default function NewQuoteScreen() {
     }
   };
 
+  const ensurePro = async (featureName: string) => {
+    if (isPro) return true;
+
+    const refreshedIsPro = await reloadPlan();
+    if (refreshedIsPro) return true;
+
+    setUpgradeFeature(featureName);
+    return false;
+  };
+
   const generateQuote = async () => {
-    if (!isPro) {
-      setUpgradeFeature("AI quote generation");
-      return;
-    }
+    if (!(await ensurePro("AI quote generation"))) return;
 
     if (!customerName.trim() || !description.trim()) {
       setError("Please fill in customer name and job description.");
@@ -210,10 +217,7 @@ export default function NewQuoteScreen() {
 
 
   const improveDescription = async () => {
-    if (!isPro) {
-      setUpgradeFeature("AI improve wording");
-      return;
-    }
+    if (!(await ensurePro("AI improve wording"))) return;
 
     if (!settings.aiAssistanceEnabled || improvingDescription) return;
 
@@ -422,11 +426,10 @@ export default function NewQuoteScreen() {
               <TouchableOpacity
                 style={[styles.aiToggle, { backgroundColor: settings.aiAssistanceEnabled ? colors.primary : colors.muted }]}
                 onPress={() => {
-                  if (!isPro && !settings.aiAssistanceEnabled) {
-                    setUpgradeFeature("AI Assistance");
-                    return;
-                  }
-                  void updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled });
+                  void (async () => {
+                    if (!settings.aiAssistanceEnabled && !(await ensurePro("AI Assistance"))) return;
+                    await updateSettings({ aiAssistanceEnabled: !settings.aiAssistanceEnabled });
+                  })();
                 }}
                 activeOpacity={0.85}
               >
