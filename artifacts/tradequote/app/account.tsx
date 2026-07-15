@@ -262,7 +262,7 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingBottom: 60 },
+  container: { padding: 20, paddingBottom: 110 },
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18, marginTop: 6 },
   backBtn: { padding: 4 },
   topTitle: { fontSize: 18, fontWeight: "700", color: "#111" },
