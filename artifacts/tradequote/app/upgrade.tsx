@@ -79,7 +79,7 @@ export default function UpgradeScreen() {
 
   const priceLabel = price
     ? `£${(price.unit_amount / 100).toFixed(2)}/${price.recurring?.interval || "month"}`
-    : "£17.50/month";
+    : "£14.99/month";
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#FAFAFA" }} contentContainerStyle={styles.container}>
