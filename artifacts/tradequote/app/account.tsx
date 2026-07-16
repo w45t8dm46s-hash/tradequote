@@ -75,7 +75,11 @@ export default function AccountScreen() {
       setMe(data);
       hasLoadedRef.current = true;
     } catch (e: any) {
-      setError(e?.message || "Could not load account. Please refresh or try again.");
+      if (meRef.current) {
+        setError("");
+      } else {
+        setError(e?.message || "Could not load account. Please refresh or try again.");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
