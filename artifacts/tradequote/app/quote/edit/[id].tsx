@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -55,7 +55,7 @@ const UNIT_OPTIONS = [
 export default function EditQuoteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getQuote, updateQuote } = useQuotes();
+  const { getQuote, updateQuote, loading: quotesLoading } = useQuotes();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
   const { isPro, reload: reloadPlan } = usePlan();
@@ -68,11 +68,33 @@ export default function EditQuoteScreen() {
   const [improvingScope, setImprovingScope] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState("");
 
+  useEffect(() => {
+    if (!draft && original) {
+      setDraft(getInitialDraft(original));
+    }
+  }, [draft, original]);
+
+  const recalc = draft ? (() => {
+    const subtotal = Math.round(draft.lineItems.reduce((s, it) => s + (it.total || 0), 0) * 100) / 100;
+    const taxRate = draft.taxRate || 0;
+    const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
+    const total = Math.round((subtotal + taxAmount) * 100) / 100;
+    return { subtotal, taxAmount, total };
+  })() : { subtotal: 0, taxAmount: 0, total: 0 };
+
+  if (quotesLoading && !original) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.notFound}>Loading quote...</Text>
+      </View>
+    );
+  }
+
   if (!draft || !original) {
     return (
       <View style={styles.center}>
         <Text style={styles.notFound}>Quote not found</Text>
-        <Pressable onPress={() => router.back()}><Text style={styles.link}>Go back</Text></Pressable>
+        <Pressable onPress={() => router.replace("/(tabs)/quotes" as any)}><Text style={styles.link}>Back to quotes</Text></Pressable>
       </View>
     );
   }
@@ -97,14 +119,6 @@ export default function EditQuoteScreen() {
   const removeItem = (idx: number) => {
     setDraft((d) => d ? ({ ...d, lineItems: d.lineItems.filter((_, i) => i !== idx) }) : d);
   };
-
-  const recalc = useMemo(() => {
-    const subtotal = Math.round(draft.lineItems.reduce((s, it) => s + (it.total || 0), 0) * 100) / 100;
-    const taxRate = draft.taxRate || 0;
-    const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
-    const total = Math.round((subtotal + taxAmount) * 100) / 100;
-    return { subtotal, taxAmount, total };
-  }, [draft.lineItems, draft.taxRate]);
 
   const ensurePro = async (featureName: string) => {
     if (isPro) return true;
@@ -370,7 +384,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 60 },
+  container: { padding: 16, paddingBottom: 110 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
   notFound: { fontSize: 16, color: "#111", fontWeight: "600" },
   link: { color: "#FF6B35", fontWeight: "600" },

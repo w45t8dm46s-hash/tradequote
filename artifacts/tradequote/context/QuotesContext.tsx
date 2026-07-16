@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useAuth } from "@clerk/expo";
-import { getApiBaseUrl, parseJsonResponse } from "@/lib/api";
+
+import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "declined";
 
@@ -44,6 +45,7 @@ interface QuotesContextValue {
   deleteQuote: (id: string) => Promise<void>;
   getQuote: (id: string) => Quote | undefined;
   loading: boolean;
+  reloadQuotes: () => Promise<void>;
 }
 
 const QuotesContext = createContext<QuotesContextValue | null>(null);
@@ -52,72 +54,103 @@ const ENTITY_TYPE = "quotes";
 export function QuotesProvider({ children }: { children: React.ReactNode }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+
+  const getAuthHeaders = useCallback(async () => {
+    const token = await getToken();
+    if (!token && isSignedIn) {
+      throw new Error("Login is still loading. Please try again.");
+    }
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, [getToken, isSignedIn]);
 
   const loadQuotes = useCallback(async () => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn) {
+      setQuotes([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const token = await getToken();
-      const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const response = await fetchWithRetry(async () => {
+        const headers = await getAuthHeaders();
+        return fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}?t=${Date.now()}`, {
+          headers: { ...headers, "Cache-Control": "no-cache" },
+        });
       });
+
       const rows = await parseJsonResponse<{ id: string; payload: Quote }[]>(response);
-      const next = rows.map((row) => row.payload).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      const next = rows
+        .map((row) => row.payload)
+        .filter(Boolean)
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
       setQuotes(next);
     } catch (error) {
       console.error("Failed to load quotes", error);
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, [getAuthHeaders, isLoaded, isSignedIn]);
 
   useEffect(() => {
     void loadQuotes();
   }, [loadQuotes]);
 
   const syncRecord = useCallback(async (record: Quote) => {
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(record),
+    if (!isSignedIn) throw new Error("You are not signed in.");
+
+    const response = await fetchWithRetry(async () => {
+      const headers = await getAuthHeaders();
+      return fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify(record),
+      });
     });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error((data as any).error || "Failed to save quote");
-    }
+
+    await parseJsonResponse(response);
     await loadQuotes();
-  }, [getToken, loadQuotes]);
+  }, [getAuthHeaders, isSignedIn, loadQuotes]);
 
   const addQuote = useCallback(async (quote: Quote) => {
     await syncRecord(quote);
   }, [syncRecord]);
 
   const updateQuote = useCallback(async (id: string, updates: Partial<Quote>) => {
-    setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, ...updates } : q));
     const existing = quotes.find((q) => q.id === id);
-    if (existing) {
-      await syncRecord({ ...existing, ...updates });
-    }
+    if (!existing) throw new Error("Quote is still loading. Please try again.");
+
+    await syncRecord({ ...existing, ...updates });
   }, [quotes, syncRecord]);
 
   const deleteQuote = useCallback(async (id: string) => {
-    setQuotes((prev) => prev.filter((q) => q.id !== id));
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}/${id}`, {
-      method: "DELETE",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    if (!isSignedIn) throw new Error("You are not signed in.");
+
+    const response = await fetchWithRetry(async () => {
+      const headers = await getAuthHeaders();
+      return fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}/${id}`, {
+        method: "DELETE",
+        headers,
+      });
     });
+
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       throw new Error((data as any).error || "Failed to delete quote");
     }
+
     await loadQuotes();
-  }, [getToken, loadQuotes]);
+  }, [getAuthHeaders, isSignedIn, loadQuotes]);
 
   const getQuote = useCallback((id: string) => quotes.find((q) => q.id === id), [quotes]);
 
   return (
-    <QuotesContext.Provider value={{ quotes, addQuote, updateQuote, deleteQuote, getQuote, loading }}>
+    <QuotesContext.Provider value={{ quotes, addQuote, updateQuote, deleteQuote, getQuote, loading, reloadQuotes: loadQuotes }}>
       {children}
     </QuotesContext.Provider>
   );

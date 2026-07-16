@@ -1,20 +1,15 @@
 import { Platform } from "react-native";
 
 export function getApiBaseUrl(): string {
-  // Explicit API URL takes top priority (required when webapp + API are on separate Render services)
   if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, "");
   if (process.env.VITE_API_URL) return (process.env.VITE_API_URL as string).replace(/\/$/, "");
 
-  // Native app — use the configured domain if provided
   if (Platform.OS !== "web") {
     const domain = process.env.EXPO_PUBLIC_DOMAIN;
     if (domain) return `https://${domain}`;
     return "";
   }
 
-  // Web — fall back to same-origin only when no explicit API URL is set.
-  // NOTE: this WILL break if the webapp and API are on different origins.
-  // Always set EXPO_PUBLIC_API_URL in production to avoid this.
   if (typeof window !== "undefined" && window.location?.origin) {
     const host = window.location.hostname;
     if (host === "quoteforge.uk" || host === "www.quoteforge.uk") {
@@ -26,14 +21,59 @@ export function getApiBaseUrl(): string {
   return "";
 }
 
-/**
- * Parses a fetch Response as JSON, with a clear error if the server returned
- * HTML (e.g. a Render/Nginx error page instead of the API).
- */
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shouldRetryResponse(resp: Response): boolean {
+  return resp.status === 401 || resp.status === 408 || resp.status === 429 || resp.status >= 500;
+}
+
+export async function fetchWithRetry(
+  makeRequest: () => Promise<Response>,
+  options: { retries?: number; delayMs?: number } = {},
+): Promise<Response> {
+  const retries = options.retries ?? 2;
+  const delayMs = options.delayMs ?? 700;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const resp = await makeRequest();
+
+      if (attempt < retries && shouldRetryResponse(resp)) {
+        await wait(delayMs * (attempt + 1));
+        continue;
+      }
+
+      return resp;
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < retries) {
+        await wait(delayMs * (attempt + 1));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Request failed");
+}
+
 export async function parseJsonResponse<T = unknown>(resp: Response): Promise<T> {
   const contentType = resp.headers.get("content-type") ?? "";
+  const text = await resp.text().catch(() => "");
+
+  if (!text) {
+    if (!resp.ok) {
+      throw new Error(`API request failed (${resp.status} ${resp.statusText})`);
+    }
+    return {} as T;
+  }
+
   if (!contentType.includes("application/json")) {
-    const text = await resp.text().catch(() => "(unreadable body)");
     const preview = text.slice(0, 120).replace(/\s+/g, " ");
     throw new Error(
       `API returned non-JSON response (${resp.status} ${resp.statusText}). ` +
@@ -41,5 +81,12 @@ export async function parseJsonResponse<T = unknown>(resp: Response): Promise<T>
       `Body preview: ${preview}`
     );
   }
-  return resp.json() as Promise<T>;
+
+  const data = JSON.parse(text);
+
+  if (!resp.ok) {
+    throw new Error(data?.error || `API request failed (${resp.status} ${resp.statusText})`);
+  }
+
+  return data as T;
 }
