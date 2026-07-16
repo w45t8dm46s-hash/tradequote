@@ -12,9 +12,11 @@ type MeResponse = {
 
 export function usePlan() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const didInitialLoadRef = useRef(false);
+  const isProRef = useRef(false);
+
   const [loading, setLoading] = useState(true);
   const [isPro, setIsPro] = useState(false);
-  const isProRef = useRef(false);
   const [quoteCount, setQuoteCount] = useState<number | null>(null);
   const [quoteLimit, setQuoteLimit] = useState<number | null>(null);
   const [quotesRemaining, setQuotesRemaining] = useState<number | null>(null);
@@ -22,7 +24,7 @@ export function usePlan() {
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
 
   const reload = useCallback(async (): Promise<boolean> => {
-    if (!isLoaded) return false;
+    if (!isLoaded) return isProRef.current;
 
     if (!isSignedIn) {
       isProRef.current = false;
@@ -45,7 +47,7 @@ export function usePlan() {
             "Cache-Control": "no-cache",
           },
         });
-      });
+      }, { retries: 1, delayMs: 800 });
 
       const data = await parseJsonResponse<MeResponse & { error?: string }>(response);
       const pro = Boolean(data.isPro);
@@ -67,39 +69,10 @@ export function usePlan() {
   }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
+    if (!isLoaded || didInitialLoadRef.current) return;
+    didInitialLoadRef.current = true;
     void reload();
-  }, [reload]);
-
-  useEffect(() => {
-    if (!isSignedIn) return;
-
-    const refresh = () => {
-      void reload();
-    };
-
-    if (typeof window !== "undefined" && window.addEventListener) {
-      window.addEventListener("focus", refresh);
-
-      const onVisibilityChange = () => {
-        if (typeof document !== "undefined" && document.visibilityState === "visible") {
-          refresh();
-        }
-      };
-
-      if (typeof document !== "undefined" && document.addEventListener) {
-        document.addEventListener("visibilitychange", onVisibilityChange);
-
-        return () => {
-          window.removeEventListener("focus", refresh);
-          document.removeEventListener("visibilitychange", onVisibilityChange);
-        };
-      }
-
-      return () => {
-        window.removeEventListener("focus", refresh);
-      };
-    }
-  }, [isSignedIn, reload]);
+  }, [isLoaded, reload]);
 
   return {
     loading,
