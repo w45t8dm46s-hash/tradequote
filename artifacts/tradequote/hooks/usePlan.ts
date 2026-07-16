@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/expo";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 
@@ -14,6 +14,7 @@ export function usePlan() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [loading, setLoading] = useState(true);
   const [isPro, setIsPro] = useState(false);
+  const isProRef = useRef(false);
   const [quoteCount, setQuoteCount] = useState<number | null>(null);
   const [quoteLimit, setQuoteLimit] = useState<number | null>(null);
   const [quotesRemaining, setQuotesRemaining] = useState<number | null>(null);
@@ -24,6 +25,7 @@ export function usePlan() {
     if (!isLoaded) return false;
 
     if (!isSignedIn) {
+      isProRef.current = false;
       setIsPro(false);
       setQuoteCount(null);
       setQuoteLimit(null);
@@ -48,6 +50,7 @@ export function usePlan() {
       const data = await parseJsonResponse<MeResponse & { error?: string }>(response);
       const pro = Boolean(data.isPro);
 
+      isProRef.current = pro;
       setIsPro(pro);
       setQuoteCount(typeof data.quoteCount === "number" ? data.quoteCount : null);
       setQuoteLimit(typeof data.quoteLimit === "number" ? data.quoteLimit : null);
@@ -57,11 +60,11 @@ export function usePlan() {
       return pro;
     } catch (e: any) {
       setError(e?.message || "Could not load plan details.");
-      return isPro;
+      return isProRef.current;
     } finally {
       setLoading(false);
     }
-  }, [getToken, isLoaded, isSignedIn, isPro]);
+  }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
     void reload();
