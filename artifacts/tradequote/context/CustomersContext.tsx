@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useAuth } from "@clerk/expo";
-import { getApiBaseUrl, parseJsonResponse } from "@/lib/api";
+
+import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 
 export interface Customer {
   id: string;
@@ -19,6 +20,7 @@ interface CustomersContextValue {
   deleteCustomer: (id: string) => Promise<void>;
   getCustomer: (id: string) => Customer | undefined;
   loading: boolean;
+  reloadCustomers: () => Promise<void>;
 }
 
 const CustomersContext = createContext<CustomersContextValue | null>(null);
@@ -27,72 +29,103 @@ const ENTITY_TYPE = "customers";
 export function CustomersProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+
+  const getAuthHeaders = useCallback(async () => {
+    const token = await getToken();
+    if (!token && isSignedIn) {
+      throw new Error("Login is still loading. Please try again.");
+    }
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, [getToken, isSignedIn]);
 
   const loadCustomers = useCallback(async () => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn) {
+      setCustomers([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const token = await getToken();
-      const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const response = await fetchWithRetry(async () => {
+        const headers = await getAuthHeaders();
+        return fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}?t=${Date.now()}`, {
+          headers: { ...headers, "Cache-Control": "no-cache" },
+        });
       });
+
       const rows = await parseJsonResponse<{ id: string; payload: Customer }[]>(response);
-      const next = rows.map((row) => row.payload).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      const next = rows
+        .map((row) => row.payload)
+        .filter(Boolean)
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
       setCustomers(next);
     } catch (error) {
       console.error("Failed to load customers", error);
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, [getAuthHeaders, isLoaded, isSignedIn]);
 
   useEffect(() => {
     void loadCustomers();
   }, [loadCustomers]);
 
   const syncRecord = useCallback(async (record: Customer) => {
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(record),
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error((data as any).error || "Failed to save customer");
-    }
-    await loadCustomers();
-  }, [getToken, loadCustomers]);
+    if (!isSignedIn) throw new Error("You are not signed in.");
 
-  const addCustomer = useCallback(async (c: Customer) => {
-    await syncRecord(c);
+    const response = await fetchWithRetry(async () => {
+      const headers = await getAuthHeaders();
+      return fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify(record),
+      });
+    });
+
+    await parseJsonResponse(response);
+    await loadCustomers();
+  }, [getAuthHeaders, isSignedIn, loadCustomers]);
+
+  const addCustomer = useCallback(async (customer: Customer) => {
+    await syncRecord(customer);
   }, [syncRecord]);
 
   const updateCustomer = useCallback(async (id: string, updates: Partial<Customer>) => {
-    setCustomers((prev) => prev.map((c) => c.id === id ? { ...c, ...updates } : c));
     const existing = customers.find((c) => c.id === id);
-    if (existing) {
-      await syncRecord({ ...existing, ...updates });
-    }
+    if (!existing) throw new Error("Customer is still loading. Please try again.");
+
+    await syncRecord({ ...existing, ...updates });
   }, [customers, syncRecord]);
 
   const deleteCustomer = useCallback(async (id: string) => {
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}/${id}`, {
-      method: "DELETE",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    if (!isSignedIn) throw new Error("You are not signed in.");
+
+    const response = await fetchWithRetry(async () => {
+      const headers = await getAuthHeaders();
+      return fetch(`${getApiBaseUrl()}/api/me/records/${ENTITY_TYPE}/${id}`, {
+        method: "DELETE",
+        headers,
+      });
     });
+
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       throw new Error((data as any).error || "Failed to delete customer");
     }
+
     await loadCustomers();
-  }, [getToken, loadCustomers]);
+  }, [getAuthHeaders, isSignedIn, loadCustomers]);
 
   const getCustomer = useCallback((id: string) => customers.find((c) => c.id === id), [customers]);
 
   return (
-    <CustomersContext.Provider value={{ customers, addCustomer, updateCustomer, deleteCustomer, getCustomer, loading }}>
+    <CustomersContext.Provider value={{ customers, addCustomer, updateCustomer, deleteCustomer, getCustomer, loading, reloadCustomers: loadCustomers }}>
       {children}
     </CustomersContext.Provider>
   );
