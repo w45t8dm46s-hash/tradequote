@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
 import { useRouter } from "expo-router";
@@ -41,6 +41,7 @@ export default function AccountScreen() {
   const { user } = useUser();
   const clerk = useClerk();
   const [me, setMe] = useState<MeResponse | null>(null);
+  const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -51,7 +52,7 @@ export default function AccountScreen() {
   const load = useCallback(async (silent = false) => {
     setError("");
 
-    if (!silent && !me) {
+    if (!silent && !hasLoadedRef.current) {
       setLoading(true);
     } else {
       setRefreshing(true);
@@ -70,13 +71,14 @@ export default function AccountScreen() {
 
       const data = await parseJsonResponse<MeResponse>(resp);
       setMe(data);
+      hasLoadedRef.current = true;
     } catch (e: any) {
       setError(e?.message || "Could not load account. Please refresh or try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [getToken, me]);
+  }, [getToken]);
 
   useEffect(() => {
     void load(false);
