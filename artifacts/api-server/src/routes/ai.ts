@@ -9,9 +9,20 @@ function firstText(content: any): string {
   return item?.text ?? "";
 }
 
+function getInputText(body: any): string {
+  return String(
+    body?.text ??
+    body?.scope ??
+    body?.description ??
+    body?.wording ??
+    body?.content ??
+    ""
+  ).trim();
+}
+
 router.post("/ai/improve-wording", requireAuth, async (req: AuthedRequest, res) => {
   try {
-    const text = String(req.body?.text ?? "").trim();
+    const text = getInputText(req.body);
     const context = String(req.body?.context ?? "").trim();
 
     if (!text) {
@@ -25,7 +36,9 @@ router.post("/ai/improve-wording", requireAuth, async (req: AuthedRequest, res) 
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
 
     if (!apiKey) {
-      return res.status(503).json({ error: "AI wording is not configured yet. Set ANTHROPIC_API_KEY on QuoteForge.api." });
+      return res.status(503).json({
+        error: "AI wording is not configured yet. Set ANTHROPIC_API_KEY on QuoteForge.api.",
+      });
     }
 
     const prompt = [
@@ -40,6 +53,8 @@ router.post("/ai/improve-wording", requireAuth, async (req: AuthedRequest, res) 
       text,
     ].filter(Boolean).join("\n");
 
+    const model = process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest";
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -48,7 +63,7 @@ router.post("/ai/improve-wording", requireAuth, async (req: AuthedRequest, res) 
         "x-api-key": apiKey,
       },
       body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest",
+        model,
         max_tokens: 500,
         temperature: 0.2,
         messages: [{ role: "user", content: prompt }],
@@ -59,6 +74,11 @@ router.post("/ai/improve-wording", requireAuth, async (req: AuthedRequest, res) 
 
     if (!response.ok) {
       const message = data?.error?.message || data?.message || "AI wording request failed.";
+      console.error("Anthropic improve-wording error:", {
+        status: response.status,
+        model,
+        message,
+      });
       return res.status(response.status).json({ error: message });
     }
 
