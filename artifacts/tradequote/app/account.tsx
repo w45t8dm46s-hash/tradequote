@@ -84,32 +84,6 @@ export default function AccountScreen() {
     void load(false);
   }, [load]);
 
-  useEffect(() => {
-    const refresh = () => {
-      void load(true);
-    };
-
-    if (typeof window !== "undefined" && window.addEventListener) {
-      window.addEventListener("focus", refresh);
-
-      const onVisibilityChange = () => {
-        if (typeof document !== "undefined" && document.visibilityState === "visible") {
-          refresh();
-        }
-      };
-
-      if (typeof document !== "undefined" && document.addEventListener) {
-        document.addEventListener("visibilitychange", onVisibilityChange);
-
-        return () => {
-          window.removeEventListener("focus", refresh);
-          document.removeEventListener("visibilitychange", onVisibilityChange);
-        };
-      }
-
-      return () => window.removeEventListener("focus", refresh);
-    }
-  }, [load]);
 
   const handleCancel = async () => {
     setShowConfirm(false);
@@ -184,13 +158,11 @@ export default function AccountScreen() {
             <View style={styles.card}>
               <View style={styles.row}>
                 <Text style={styles.cardTitle}>Subscription</Text>
-                {refreshing ? <ActivityIndicator color="#FF6B35" size="small" /> : (
-                  <View style={[styles.badge, me?.isPro ? styles.badgePro : styles.badgeFree]}>
-                    <Text style={[styles.badgeText, me?.isPro ? styles.badgeTextPro : styles.badgeTextFree]}>
-                      {me?.isPro ? "Pro" : "Free"}
-                    </Text>
-                  </View>
-                )}
+                <View style={[styles.badge, me?.isPro ? styles.badgePro : styles.badgeFree]}>
+                  <Text style={[styles.badgeText, me?.isPro ? styles.badgeTextPro : styles.badgeTextFree]}>
+                    {me?.isPro ? "Pro" : "Free"}
+                  </Text>
+                </View>
               </View>
 
               {error ? (
