@@ -41,6 +41,7 @@ export default function AccountScreen() {
   const { user } = useUser();
   const clerk = useClerk();
   const [me, setMe] = useState<MeResponse | null>(null);
+  const meRef = useRef<MeResponse | null>(null);
   const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,6 +71,7 @@ export default function AccountScreen() {
       });
 
       const data = await parseJsonResponse<MeResponse>(resp);
+      meRef.current = data;
       setMe(data);
       hasLoadedRef.current = true;
     } catch (e: any) {
