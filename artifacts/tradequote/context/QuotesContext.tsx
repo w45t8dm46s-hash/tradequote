@@ -51,12 +51,17 @@ interface QuotesContextValue {
 const QuotesContext = createContext<QuotesContextValue | null>(null);
 const ENTITY_TYPE = "quotes";
 
+function upsertQuote(list: Quote[], quote: Quote) {
+  const without = list.filter((q) => q.id !== quote.id);
+  return [quote, ...without].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+}
+
 export function QuotesProvider({ children }: { children: React.ReactNode }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const { getToken, isLoaded, isSignedIn } = useAuth();
 
-  const getAuthHeaders = useCallback(async () => {
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const token = await getToken();
     if (!token && isSignedIn) {
       throw new Error("Login is still loading. Please try again.");
@@ -114,8 +119,8 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
     });
 
     await parseJsonResponse(response);
-    await loadQuotes();
-  }, [getAuthHeaders, isSignedIn, loadQuotes]);
+    setQuotes((prev) => upsertQuote(prev, record));
+  }, [getAuthHeaders, isSignedIn]);
 
   const addQuote = useCallback(async (quote: Quote) => {
     await syncRecord(quote);
@@ -125,7 +130,8 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
     const existing = quotes.find((q) => q.id === id);
     if (!existing) throw new Error("Quote is still loading. Please try again.");
 
-    await syncRecord({ ...existing, ...updates });
+    const next = { ...existing, ...updates };
+    await syncRecord(next);
   }, [quotes, syncRecord]);
 
   const deleteQuote = useCallback(async (id: string) => {
@@ -139,13 +145,9 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
       });
     });
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error((data as any).error || "Failed to delete quote");
-    }
-
-    await loadQuotes();
-  }, [getAuthHeaders, isSignedIn, loadQuotes]);
+    await parseJsonResponse(response);
+    setQuotes((prev) => prev.filter((q) => q.id !== id));
+  }, [getAuthHeaders, isSignedIn]);
 
   const getQuote = useCallback((id: string) => quotes.find((q) => q.id === id), [quotes]);
 

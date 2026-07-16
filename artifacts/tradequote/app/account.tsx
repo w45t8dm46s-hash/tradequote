@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
-import { getApiBaseUrl } from "@/lib/api";
+import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 import BottomNav from "@/components/BottomNav";
 
 type MeResponse = {
@@ -42,47 +42,91 @@ export default function AccountScreen() {
   const clerk = useClerk();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     setError("");
+
+    if (!silent && !me) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
     try {
-      const token = await getToken();
-      const resp = await fetch(`${getApiBaseUrl()}/api/me`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const resp = await fetchWithRetry(async () => {
+        const token = await getToken();
+        return fetch(`${getApiBaseUrl()}/api/me?t=${Date.now()}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "Cache-Control": "no-cache",
+          },
+        });
       });
-      const data = (await resp.json()) as MeResponse;
-      if (!resp.ok) throw new Error((data as any).error || "Failed to load account");
+
+      const data = await parseJsonResponse<MeResponse>(resp);
       setMe(data);
     } catch (e: any) {
-      setError(e.message || "Could not load account");
+      setError(e?.message || "Could not load account. Please refresh or try again.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [getToken]);
+  }, [getToken, me]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load(false);
+  }, [load]);
+
+  useEffect(() => {
+    const refresh = () => {
+      void load(true);
+    };
+
+    if (typeof window !== "undefined" && window.addEventListener) {
+      window.addEventListener("focus", refresh);
+
+      const onVisibilityChange = () => {
+        if (typeof document !== "undefined" && document.visibilityState === "visible") {
+          refresh();
+        }
+      };
+
+      if (typeof document !== "undefined" && document.addEventListener) {
+        document.addEventListener("visibilitychange", onVisibilityChange);
+
+        return () => {
+          window.removeEventListener("focus", refresh);
+          document.removeEventListener("visibilitychange", onVisibilityChange);
+        };
+      }
+
+      return () => window.removeEventListener("focus", refresh);
+    }
+  }, [load]);
 
   const handleCancel = async () => {
     setShowConfirm(false);
     setBusy(true);
     setError("");
     setInfo("");
+
     try {
       const token = await getToken();
-      const resp = await fetch(`${getApiBaseUrl()}/api/stripe/cancel`, {
+      const resp = await fetchWithRetry(() => fetch(`${getApiBaseUrl()}/api/stripe/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Failed to cancel");
+      }));
+
+      const data = await parseJsonResponse<any>(resp);
       setInfo("Your subscription will end at the end of the current billing period. You'll keep Pro access until then.");
-      await load();
+      await load(true);
     } catch (e: any) {
-      setError(e.message || "Cancel failed");
+      setError(e?.message || "Cancel failed");
     } finally {
       setBusy(false);
     }
@@ -92,18 +136,19 @@ export default function AccountScreen() {
     setBusy(true);
     setError("");
     setInfo("");
+
     try {
       const token = await getToken();
-      const resp = await fetch(`${getApiBaseUrl()}/api/stripe/resume`, {
+      const resp = await fetchWithRetry(() => fetch(`${getApiBaseUrl()}/api/stripe/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Failed to resume");
+      }));
+
+      const data = await parseJsonResponse<any>(resp);
       setInfo("Your subscription has been resumed. Renewal will continue as normal.");
-      await load();
+      await load(true);
     } catch (e: any) {
-      setError(e.message || "Resume failed");
+      setError(e?.message || "Resume failed");
     } finally {
       setBusy(false);
     }
@@ -113,151 +158,163 @@ export default function AccountScreen() {
   const sub = me?.subscription ?? null;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#FAFAFA" }} contentContainerStyle={styles.container}>
-      <View style={styles.topBar}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color="#111" />
-        </Pressable>
-        <Text style={styles.topTitle}>My Account</Text>
-        <View style={{ width: 22 }} />
-      </View>
-
-      {loading ? (
-        <View style={{ paddingVertical: 40 }}>
-          <ActivityIndicator color="#FF6B35" />
+    <>
+      <ScrollView style={{ flex: 1, backgroundColor: "#FAFAFA" }} contentContainerStyle={styles.container}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.replace("/(tabs)" as any)} style={styles.backBtn}>
+            <Feather name="arrow-left" size={22} color="#111" />
+          </Pressable>
+          <Text style={styles.topTitle}>My Account</Text>
+          <View style={{ width: 22 }} />
         </View>
-      ) : (
-        <>
-          <View style={styles.card}>
-            <Text style={styles.label}>Signed in as</Text>
-            <Text style={styles.value}>{email || "—"}</Text>
-          </View>
 
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.cardTitle}>Subscription</Text>
-              <View style={[styles.badge, me?.isPro ? styles.badgePro : styles.badgeFree]}>
-                <Text style={[styles.badgeText, me?.isPro ? styles.badgeTextPro : styles.badgeTextFree]}>
-                  {me?.isPro ? "Pro" : "Free"}
-                </Text>
-              </View>
+        {loading && !me ? (
+          <View style={{ paddingVertical: 40 }}>
+            <ActivityIndicator color="#FF6B35" />
+          </View>
+        ) : (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.label}>Signed in as</Text>
+              <Text style={styles.value}>{email || "—"}</Text>
             </View>
 
-            {sub ? (
-              <View style={{ gap: 8, marginTop: 4 }}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Plan</Text>
-                  <Text style={styles.detailValue}>{formatPrice(sub.priceAmount, sub.currency, sub.interval)}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{sub.cancelAtPeriodEnd ? "Ends on" : "Renews on"}</Text>
-                  <Text style={styles.detailValue}>{formatDate(sub.currentPeriodEnd)}</Text>
-                </View>
-                {sub.cancelAtPeriodEnd && (
-                  <View style={styles.notice}>
-                    <Feather name="alert-circle" size={14} color="#B45309" />
-                    <Text style={styles.noticeText}>Cancellation scheduled. You'll keep Pro until {formatDate(sub.currentPeriodEnd)}.</Text>
+            <View style={styles.card}>
+              <View style={styles.row}>
+                <Text style={styles.cardTitle}>Subscription</Text>
+                {refreshing ? <ActivityIndicator color="#FF6B35" size="small" /> : (
+                  <View style={[styles.badge, me?.isPro ? styles.badgePro : styles.badgeFree]}>
+                    <Text style={[styles.badgeText, me?.isPro ? styles.badgeTextPro : styles.badgeTextFree]}>
+                      {me?.isPro ? "Pro" : "Free"}
+                    </Text>
                   </View>
                 )}
               </View>
-            ) : (
-              <View style={{ marginTop: 4 }}>
-                <Text style={styles.smallMuted}>
-                  You've used {me?.quoteCount ?? 0} of {me?.quoteLimit ?? 5} free quotes.
-                </Text>
-              </View>
-            )}
 
-            {info ? <Text style={styles.info}>{info}</Text> : null}
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error ? (
+                <View style={styles.errorPanel}>
+                  <Text style={styles.error}>{error}</Text>
+                  <Pressable style={styles.outlineBtn} onPress={() => load(false)}>
+                    <Feather name="refresh-cw" size={16} color="#111" />
+                    <Text style={styles.outlineBtnText}>Retry account check</Text>
+                  </Pressable>
+                </View>
+              ) : null}
 
-            <View style={{ gap: 10, marginTop: 14 }}>
-              {!me?.isPro && (
-                <Pressable style={styles.primaryBtn} onPress={() => router.push("/upgrade")}>
-                  <Feather name="zap" size={16} color="#fff" />
-                  <Text style={styles.primaryBtnText}>Upgrade to Pro</Text>
-                </Pressable>
-              )}
-
-              {sub && !sub.cancelAtPeriodEnd && (
-                <Pressable
-                  style={[styles.dangerBtn, busy && styles.btnDisabled]}
-                  onPress={() => setShowConfirm(true)}
-                  disabled={busy}
-                >
-                  {busy ? <ActivityIndicator color="#EF4444" /> : (
-                    <>
-                      <Feather name="x-circle" size={16} color="#EF4444" />
-                      <Text style={styles.dangerBtnText}>Cancel subscription</Text>
-                    </>
+              {sub ? (
+                <View style={{ gap: 8, marginTop: 4 }}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Plan</Text>
+                    <Text style={styles.detailValue}>{formatPrice(sub.priceAmount, sub.currency, sub.interval)}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>{sub.cancelAtPeriodEnd ? "Ends on" : "Renews on"}</Text>
+                    <Text style={styles.detailValue}>{formatDate(sub.currentPeriodEnd)}</Text>
+                  </View>
+                  {sub.cancelAtPeriodEnd && (
+                    <View style={styles.notice}>
+                      <Feather name="alert-circle" size={14} color="#B45309" />
+                      <Text style={styles.noticeText}>Cancellation scheduled. You'll keep Pro until {formatDate(sub.currentPeriodEnd)}.</Text>
+                    </View>
                   )}
-                </Pressable>
-              )}
+                </View>
+              ) : me ? (
+                <View style={{ marginTop: 4 }}>
+                  <Text style={styles.smallMuted}>
+                    You've used {me.quoteCount ?? 0} of {me.quoteLimit ?? 5} free quotes.
+                  </Text>
+                </View>
+              ) : null}
 
-              {sub && sub.cancelAtPeriodEnd && (
-                <Pressable style={[styles.primaryBtn, busy && styles.btnDisabled]} onPress={handleResume} disabled={busy}>
-                  {busy ? <ActivityIndicator color="#fff" /> : (
-                    <>
-                      <Feather name="refresh-cw" size={16} color="#fff" />
-                      <Text style={styles.primaryBtnText}>Resume subscription</Text>
-                    </>
+              {info ? <Text style={styles.info}>{info}</Text> : null}
+
+              {me ? (
+                <View style={{ gap: 10, marginTop: 14 }}>
+                  {!me.isPro && (
+                    <Pressable style={styles.primaryBtn} onPress={() => router.push("/upgrade")}>
+                      <Feather name="zap" size={16} color="#fff" />
+                      <Text style={styles.primaryBtnText}>Upgrade to Pro</Text>
+                    </Pressable>
                   )}
-                </Pressable>
-              )}
+
+                  {sub && !sub.cancelAtPeriodEnd && (
+                    <Pressable style={[styles.dangerBtn, busy && styles.btnDisabled]} onPress={() => setShowConfirm(true)} disabled={busy}>
+                      {busy ? <ActivityIndicator color="#EF4444" /> : (
+                        <>
+                          <Feather name="x-circle" size={16} color="#EF4444" />
+                          <Text style={styles.dangerBtnText}>Cancel subscription</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  )}
+
+                  {sub && sub.cancelAtPeriodEnd && (
+                    <Pressable style={[styles.primaryBtn, busy && styles.btnDisabled]} onPress={handleResume} disabled={busy}>
+                      {busy ? <ActivityIndicator color="#fff" /> : (
+                        <>
+                          <Feather name="refresh-cw" size={16} color="#fff" />
+                          <Text style={styles.primaryBtnText}>Resume subscription</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  )}
+                </View>
+              ) : null}
             </View>
-          </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Business settings</Text>
-            <Text style={styles.smallMuted}>Set your branding, hourly labour rate and VAT details — these are used on quote and invoice PDFs.</Text>
-            <Pressable style={styles.outlineBtn} onPress={() => router.push("/settings")}>
-              <Feather name="settings" size={16} color="#111" />
-              <Text style={styles.outlineBtnText}>Open settings</Text>
-            </Pressable>
-          </View>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Business settings</Text>
+              <Text style={styles.smallMuted}>Set your branding, hourly labour rate and VAT details — these are used on quote and invoice PDFs.</Text>
+              <Pressable style={styles.outlineBtn} onPress={() => router.push("/settings")}>
+                <Feather name="settings" size={16} color="#111" />
+                <Text style={styles.outlineBtnText}>Open settings</Text>
+              </Pressable>
+            </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Account actions</Text>
-            <Pressable
-              style={styles.outlineBtn}
-              onPress={() => {
-                if (Platform.OS === "web") {
-                  if (confirm("Sign out of QuoteForge?")) clerk.signOut();
-                } else {
-                  clerk.signOut();
-                }
-              }}
-            >
-              <Feather name="log-out" size={16} color="#111" />
-              <Text style={styles.outlineBtnText}>Sign out</Text>
-            </Pressable>
-          </View>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Account actions</Text>
+              <Pressable
+                style={styles.outlineBtn}
+                onPress={() => {
+                  if (Platform.OS === "web") {
+                    if (confirm("Sign out of QuoteForge?")) clerk.signOut();
+                  } else {
+                    clerk.signOut();
+                  }
+                }}
+              >
+                <Feather name="log-out" size={16} color="#111" />
+                <Text style={styles.outlineBtnText}>Sign out</Text>
+              </Pressable>
+            </View>
 
-          <Text style={styles.footnote}>
-            Cancelling stops future renewals. You'll keep Pro access until the end of the current billing period and can resume any time before then.
-          </Text>
-        </>
-      )}
-
-      <Modal visible={showConfirm} transparent animationType="fade" onRequestClose={() => setShowConfirm(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setShowConfirm(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Cancel subscription?</Text>
-            <Text style={styles.modalBody}>
-              Your Pro access will continue until {formatDate(sub?.currentPeriodEnd ?? null)}. After that you'll go back to the free plan ({me?.quoteLimit ?? 5}-quote limit). You can resume any time before then.
+            <Text style={styles.footnote}>
+              Cancelling stops future renewals. You'll keep Pro access until the end of the current billing period and can resume any time before then.
             </Text>
-            <View style={styles.modalActions}>
-              <Pressable style={[styles.modalBtn, styles.modalBtnGhost]} onPress={() => setShowConfirm(false)}>
-                <Text style={styles.modalBtnGhostText}>Keep Pro</Text>
-              </Pressable>
-              <Pressable style={[styles.modalBtn, styles.modalBtnDanger]} onPress={handleCancel}>
-                <Text style={styles.modalBtnDangerText}>Cancel subscription</Text>
-              </Pressable>
-            </View>
+          </>
+        )}
+
+        <Modal visible={showConfirm} transparent animationType="fade" onRequestClose={() => setShowConfirm(false)}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowConfirm(false)}>
+            <Pressable style={styles.modalCard} onPress={() => {}}>
+              <Text style={styles.modalTitle}>Cancel subscription?</Text>
+              <Text style={styles.modalBody}>
+                Your Pro access will continue until {formatDate(sub?.currentPeriodEnd ?? null)}. After that you'll go back to the free plan ({me?.quoteLimit ?? 5}-quote limit). You can resume any time before then.
+              </Text>
+              <View style={styles.modalActions}>
+                <Pressable style={[styles.modalBtn, styles.modalBtnGhost]} onPress={() => setShowConfirm(false)}>
+                  <Text style={styles.modalBtnGhostText}>Keep Pro</Text>
+                </Pressable>
+                <Pressable style={[styles.modalBtn, styles.modalBtnDanger]} onPress={handleCancel}>
+                  <Text style={styles.modalBtnDangerText}>Cancel subscription</Text>
+                </Pressable>
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+      <BottomNav />
+    </>
   );
 }
 
@@ -285,6 +342,7 @@ const styles = StyleSheet.create({
   noticeText: { color: "#92400E", fontSize: 12.5, flex: 1, lineHeight: 17 },
   info: { color: "#15803D", fontSize: 13, marginTop: 8 },
   error: { color: "#D32F2F", fontSize: 13, marginTop: 8 },
+  errorPanel: { gap: 10, marginTop: 8 },
   primaryBtn: { backgroundColor: "#FF6B35", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 12 },
   primaryBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   dangerBtn: { borderWidth: 1, borderColor: "#FECACA", backgroundColor: "#FEF2F2", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 12 },

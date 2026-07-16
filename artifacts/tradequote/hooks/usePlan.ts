@@ -1,7 +1,7 @@
 import { useAuth } from "@clerk/expo";
 import { useCallback, useEffect, useState } from "react";
 
-import { getApiBaseUrl } from "@/lib/api";
+import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
 
 type MeResponse = {
   isPro?: boolean;
@@ -21,9 +21,7 @@ export function usePlan() {
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
 
   const reload = useCallback(async (): Promise<boolean> => {
-    if (!isLoaded) {
-      return false;
-    }
+    if (!isLoaded) return false;
 
     if (!isSignedIn) {
       setIsPro(false);
@@ -37,20 +35,17 @@ export function usePlan() {
     setError("");
 
     try {
-      const token = await getToken();
-      const response = await fetch(`${getApiBaseUrl()}/api/me?t=${Date.now()}`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "Cache-Control": "no-cache",
-        },
+      const response = await fetchWithRetry(async () => {
+        const token = await getToken();
+        return fetch(`${getApiBaseUrl()}/api/me?t=${Date.now()}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "Cache-Control": "no-cache",
+          },
+        });
       });
 
-      const data = (await response.json().catch(() => ({}))) as MeResponse & { error?: string };
-
-      if (!response.ok) {
-        throw new Error(data?.error || "Could not load plan details.");
-      }
-
+      const data = await parseJsonResponse<MeResponse & { error?: string }>(response);
       const pro = Boolean(data.isPro);
 
       setIsPro(pro);
@@ -62,12 +57,11 @@ export function usePlan() {
       return pro;
     } catch (e: any) {
       setError(e?.message || "Could not load plan details.");
-      setIsPro(false);
-      return false;
+      return isPro;
     } finally {
       setLoading(false);
     }
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, isPro]);
 
   useEffect(() => {
     void reload();
@@ -79,8 +73,6 @@ export function usePlan() {
     const refresh = () => {
       void reload();
     };
-
-    const interval = setInterval(refresh, 30000);
 
     if (typeof window !== "undefined" && window.addEventListener) {
       window.addEventListener("focus", refresh);
@@ -95,21 +87,15 @@ export function usePlan() {
         document.addEventListener("visibilitychange", onVisibilityChange);
 
         return () => {
-          clearInterval(interval);
           window.removeEventListener("focus", refresh);
           document.removeEventListener("visibilitychange", onVisibilityChange);
         };
       }
 
       return () => {
-        clearInterval(interval);
         window.removeEventListener("focus", refresh);
       };
     }
-
-    return () => {
-      clearInterval(interval);
-    };
   }, [isSignedIn, reload]);
 
   return {

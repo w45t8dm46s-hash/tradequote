@@ -26,12 +26,17 @@ interface CustomersContextValue {
 const CustomersContext = createContext<CustomersContextValue | null>(null);
 const ENTITY_TYPE = "customers";
 
+function upsertCustomer(list: Customer[], customer: Customer) {
+  const without = list.filter((c) => c.id !== customer.id);
+  return [customer, ...without].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+}
+
 export function CustomersProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const { getToken, isLoaded, isSignedIn } = useAuth();
 
-  const getAuthHeaders = useCallback(async () => {
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const token = await getToken();
     if (!token && isSignedIn) {
       throw new Error("Login is still loading. Please try again.");
@@ -89,8 +94,8 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
     });
 
     await parseJsonResponse(response);
-    await loadCustomers();
-  }, [getAuthHeaders, isSignedIn, loadCustomers]);
+    setCustomers((prev) => upsertCustomer(prev, record));
+  }, [getAuthHeaders, isSignedIn]);
 
   const addCustomer = useCallback(async (customer: Customer) => {
     await syncRecord(customer);
@@ -100,7 +105,8 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
     const existing = customers.find((c) => c.id === id);
     if (!existing) throw new Error("Customer is still loading. Please try again.");
 
-    await syncRecord({ ...existing, ...updates });
+    const next = { ...existing, ...updates };
+    await syncRecord(next);
   }, [customers, syncRecord]);
 
   const deleteCustomer = useCallback(async (id: string) => {
@@ -114,13 +120,9 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
       });
     });
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error((data as any).error || "Failed to delete customer");
-    }
-
-    await loadCustomers();
-  }, [getAuthHeaders, isSignedIn, loadCustomers]);
+    await parseJsonResponse(response);
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
+  }, [getAuthHeaders, isSignedIn]);
 
   const getCustomer = useCallback((id: string) => customers.find((c) => c.id === id), [customers]);
 
