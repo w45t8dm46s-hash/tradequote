@@ -37,7 +37,7 @@ export default function SignUpScreen() {
       setError(clerkMsg(finalErr, "Account created but sign-in failed. Please sign in."));
       return false;
     }
-    router.replace("/(tabs)" as Href);
+    router.replace("/(tabs)?showTradePicker=1" as Href);
     return true;
   };
 
