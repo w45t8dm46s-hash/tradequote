@@ -19,6 +19,7 @@ interface TradePickerProps {
 
 export default function TradePicker({ visible, onDismiss }: TradePickerProps) {
   const { settings, updateSettings } = useSettings();
+  const visibleTrades = TRADES.filter((trade) => trade.label !== "Gas Engineer");
   const [selected, setSelected] = React.useState(settings.trade || "electrician");
 
   React.useEffect(() => {
@@ -26,7 +27,7 @@ export default function TradePicker({ visible, onDismiss }: TradePickerProps) {
   }, [visible, settings.trade]);
 
   const handleContinue = async () => {
-    const trade = TRADES.find((t) => t.id === selected);
+    const trade = visibleTrades.find((t) => t.id === selected) ?? TRADES.find((t) => t.id === selected);
     await updateSettings({
       trade: selected,
       labourRate: settings.labourRate || trade?.defaultLabourRate || 45,
@@ -48,7 +49,7 @@ export default function TradePicker({ visible, onDismiss }: TradePickerProps) {
           contentContainerStyle={styles.grid}
           showsVerticalScrollIndicator={false}
         >
-          {TRADES.map((trade) => {
+          {visibleTrades.map((trade) => {
             const active = selected === trade.id;
             return (
               <Pressable

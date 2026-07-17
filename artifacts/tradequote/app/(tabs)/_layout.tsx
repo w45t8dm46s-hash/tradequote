@@ -1,5 +1,5 @@
 import { BlurView } from "expo-blur";
-import { Tabs, Redirect } from "expo-router";
+import { Tabs, Redirect, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { SymbolView } from "expo-symbols";
 import { useAuth } from "@clerk/expo";
@@ -14,14 +14,22 @@ export default function TabLayout() {
   const { isSignedIn, isLoaded } = useAuth();
   const colors = useColors();
   const colorScheme = useColorScheme();
-  const { settings, loading: settingsLoading } = useSettings();
+  const { settings, loading: settingsLoading } = useSettings();  const params = useLocalSearchParams<{ showTradePicker?: string }>();
+  const hasShownInitialTradePicker = React.useRef(false);
+
   const [showTradePicker, setShowTradePicker] = React.useState(false);
 
   React.useEffect(() => {
-    if (!settingsLoading && !settings.trade) {
+    if (
+      params.showTradePicker === "1" &&
+      !settingsLoading &&
+      !settings.trade &&
+      !hasShownInitialTradePicker.current
+    ) {
+      hasShownInitialTradePicker.current = true;
       setShowTradePicker(true);
     }
-  }, [settingsLoading, settings.trade]);
+  }, [params.showTradePicker, settingsLoading, settings.trade]);
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;

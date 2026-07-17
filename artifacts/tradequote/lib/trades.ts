@@ -40,7 +40,7 @@ export const TRADES: Trade[] = [
   },
   {
     id: "plumber",
-    label: "Plumber",
+    label: "Plumbing / Heating",
     emoji: "🔧",
     defaultLabourRate: 50,
     jobTypes: [
@@ -116,7 +116,7 @@ export const TRADES: Trade[] = [
   },
   {
     id: "carpenter",
-    label: "Carpenter",
+    label: "Joinery / Carpentry",
     emoji: "🪚",
     defaultLabourRate: 42,
     jobTypes: [
@@ -172,7 +172,7 @@ export const TRADES: Trade[] = [
   },
   {
     id: "landscaper",
-    label: "Landscaper",
+    label: "Gardening / Landscaping",
     emoji: "🌿",
     defaultLabourRate: 35,
     jobTypes: [
