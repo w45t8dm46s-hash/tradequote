@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, Linking, Platform } from "react-native";
 import { useAuth } from "@clerk/expo";
-import { useRouter } from "expo-router";
+import { useRouter, Link } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
 type PriceInfo = {
@@ -121,7 +121,12 @@ export default function UpgradeScreen() {
         )}
       </Pressable>
 
-      <Text style={styles.disclaimer}>You'll be redirected to Stripe to complete payment securely. Terms, privacy and cancellation details should be reviewed before launch.</Text>
+      <Text style={styles.disclaimer}>
+        You'll be redirected to Stripe to complete payment securely. By subscribing, you agree to the{" "}
+        <Link href="/terms" style={styles.disclaimerLink}>Terms & Conditions</Link>
+        {" "}and{" "}
+        <Link href="/privacy" style={styles.disclaimerLink}>Privacy Policy</Link>.
+      </Text>
     </ScrollView>
   );
 }
@@ -141,5 +146,6 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   disclaimer: { fontSize: 12, color: "#999", textAlign: "center", marginTop: 16 },
+  disclaimerLink: { color: "#ff5a1f", fontWeight: "700" },
   error: { color: "#D32F2F", fontSize: 14, marginBottom: 12, textAlign: "center" },
 });
