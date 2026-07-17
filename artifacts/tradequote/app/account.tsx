@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
-import { useRouter } from "expo-router";
+import { useRouter, Link } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
 import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
@@ -298,6 +298,14 @@ export default function AccountScreen() {
                   </>
                 )}
               </Pressable>
+
+              <View style={styles.legalLinks}>
+                <Link href="/terms" style={styles.legalLink}>Terms</Link>
+                <Text style={styles.legalSeparator}>•</Text>
+                <Link href="/privacy" style={styles.legalLink}>Privacy</Link>
+                <Text style={styles.legalSeparator}>•</Text>
+                <Link href="/referral-terms" style={styles.legalLink}>Referral Partner Terms</Link>
+              </View>
             </View>
 
             <Text style={styles.footnote}>
@@ -361,6 +369,9 @@ const styles = StyleSheet.create({
   dangerBtnText: { color: "#EF4444", fontSize: 15, fontWeight: "600" },
   outlineBtn: { borderWidth: 1, borderColor: "#E5E7EB", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 12, backgroundColor: "#fff" },
   outlineBtnText: { color: "#111", fontSize: 15, fontWeight: "600" },
+  legalLinks: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 8, marginTop: 18 },
+  legalLink: { color: "#ff5a1f", fontWeight: "700", fontSize: 13 },
+  legalSeparator: { color: "#999", fontSize: 13 },
   btnDisabled: { opacity: 0.5 },
   footnote: { fontSize: 11.5, color: "#999", textAlign: "center", marginTop: 4, lineHeight: 16, paddingHorizontal: 8 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 24 },
