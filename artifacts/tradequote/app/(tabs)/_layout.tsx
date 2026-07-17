@@ -1,5 +1,5 @@
 import { BlurView } from "expo-blur";
-import { Tabs, Redirect, useLocalSearchParams } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { SymbolView } from "expo-symbols";
 import { useAuth } from "@clerk/expo";
@@ -14,22 +14,24 @@ export default function TabLayout() {
   const { isSignedIn, isLoaded } = useAuth();
   const colors = useColors();
   const colorScheme = useColorScheme();
-  const { settings, loading: settingsLoading } = useSettings();  const params = useLocalSearchParams<{ showTradePicker?: string }>();
+  const { settings, loading: settingsLoading } = useSettings();
   const hasShownInitialTradePicker = React.useRef(false);
 
   const [showTradePicker, setShowTradePicker] = React.useState(false);
 
   React.useEffect(() => {
-    if (
-      params.showTradePicker === "1" &&
-      !settingsLoading &&
-      !settings.trade &&
-      !hasShownInitialTradePicker.current
-    ) {
+    if (settingsLoading || settings.trade || hasShownInitialTradePicker.current) return;
+
+    const shouldShow =
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("qf_show_trade_picker_once") === "1";
+
+    if (shouldShow) {
+      window.localStorage.removeItem("qf_show_trade_picker_once");
       hasShownInitialTradePicker.current = true;
       setShowTradePicker(true);
     }
-  }, [params.showTradePicker, settingsLoading, settings.trade]);
+  }, [settingsLoading, settings.trade]);
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
