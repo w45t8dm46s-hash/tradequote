@@ -136,6 +136,37 @@ export default function AccountScreen() {
     }
   };
 
+  const handleSignOut = async () => {
+    if (busy) return;
+
+    const proceed =
+      Platform.OS === "web"
+        ? window.confirm("Sign out of QuoteForge?")
+        : true;
+
+    if (!proceed) return;
+
+    setBusy(true);
+    setError("");
+
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("qf_show_trade_picker_once");
+      }
+
+      await clerk.signOut();
+
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.location.href = "/sign-in";
+      } else {
+        router.replace("/(auth)/sign-in" as any);
+      }
+    } catch (e: any) {
+      setError(e?.message || "Could not sign out. Please refresh and try again.");
+      setBusy(false);
+    }
+  };
+
   const email = me?.email || user?.primaryEmailAddress?.emailAddress || "";
   const sub = me?.subscription ?? null;
 
@@ -254,17 +285,18 @@ export default function AccountScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Account actions</Text>
               <Pressable
-                style={styles.outlineBtn}
-                onPress={() => {
-                  if (Platform.OS === "web") {
-                    if (confirm("Sign out of QuoteForge?")) clerk.signOut();
-                  } else {
-                    clerk.signOut();
-                  }
-                }}
+                style={[styles.outlineBtn, busy && styles.btnDisabled]}
+                onPress={handleSignOut}
+                disabled={busy}
               >
-                <Feather name="log-out" size={16} color="#111" />
-                <Text style={styles.outlineBtnText}>Sign out</Text>
+                {busy ? (
+                  <ActivityIndicator color="#111" />
+                ) : (
+                  <>
+                    <Feather name="log-out" size={16} color="#111" />
+                    <Text style={styles.outlineBtnText}>Sign out</Text>
+                  </>
+                )}
               </Pressable>
             </View>
 
