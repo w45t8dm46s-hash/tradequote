@@ -12,16 +12,22 @@ async function updateUserSubscription({
   customerId,
   subscriptionId,
   clerkUserId,
+  email,
 }: {
   customerId?: string | null;
   subscriptionId?: string | null;
   clerkUserId?: string | null;
+  email?: string | null;
 }) {
   const updates: any = {};
+
   if (customerId) updates.stripeCustomerId = customerId;
   if (subscriptionId) updates.stripeSubscriptionId = subscriptionId;
 
-  if (Object.keys(updates).length === 0) return;
+  if (Object.keys(updates).length === 0) {
+    console.warn("Stripe webhook ignored: no customer/subscription IDs to save.");
+    return;
+  }
 
   if (clerkUserId) {
     await db.update(users).set(updates).where(eq(users.id, clerkUserId));
@@ -30,6 +36,10 @@ async function updateUserSubscription({
 
   if (customerId) {
     await db.update(users).set(updates).where(eq(users.stripeCustomerId, customerId));
+  }
+
+  if (email && customerId) {
+    await db.update(users).set(updates).where(eq(users.email, email));
   }
 }
 
@@ -52,6 +62,7 @@ export class WebhookHandlers {
           customerId: asString(session.customer),
           subscriptionId: asString(session.subscription),
           clerkUserId: session.client_reference_id || session.metadata?.clerkUserId || null,
+          email: session.customer_details?.email || session.customer_email || null,
         });
 
         break;
@@ -79,12 +90,14 @@ export class WebhookHandlers {
           customerId: asString(invoice.customer),
           subscriptionId: asString((invoice as any).subscription),
           clerkUserId: null,
+          email: invoice.customer_email || null,
         });
 
         break;
       }
 
       default:
+        console.log(`Stripe webhook ignored: ${event.type}`);
         break;
     }
   }
