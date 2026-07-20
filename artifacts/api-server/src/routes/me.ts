@@ -45,7 +45,7 @@ async function getActiveSubscriptionDetails(stripeCustomerId: string | null) {
   return {
     status: subscription.status,
     cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-    currentPeriodEnd: subscription.current_period_end ?? null,
+    currentPeriodEnd: subscription.current_period_end ?? item?.current_period_end ?? null,
     priceAmount: price?.unit_amount ?? null,
     currency: price?.currency ?? null,
     interval: price?.recurring?.interval ?? null,
