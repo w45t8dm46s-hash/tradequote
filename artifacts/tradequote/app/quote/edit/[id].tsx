@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { buildSafeAiWordingPrompt, getAiWordingUnavailableMessage } from "@/lib/quoteWorkflow";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -18,6 +19,7 @@ function toNum(s: string): number {
 
 
 const GENERIC_SCOPE_TEXT = "Thank you for your enquiry. Please review the quote details below.";
+const AI_TIMEOUT_MS = 10000;
 
 function getInitialDraft(original: Quote | undefined): Quote | null {
   if (!original) return null;
@@ -55,7 +57,7 @@ const UNIT_OPTIONS = [
 export default function EditQuoteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getQuote, updateQuote, loading: quotesLoading } = useQuotes();
+  const { getQuote, updateQuote, reloadQuotes, loading: quotesLoading } = useQuotes();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
   const { isPro, reload: reloadPlan } = usePlan();
@@ -145,17 +147,21 @@ export default function EditQuoteScreen() {
 
     try {
       const token = await getToken();
+      const payload = buildSafeAiWordingPrompt(draft.customerSummary, draft.jobTypeLabel);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
       const response = await fetch(`${getApiBaseUrl()}/api/ai/improve-wording`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          text: draft.customerSummary,
-          context: `${draft.jobTypeLabel}. Improve the customer-facing scope of works only. Do not add prices.`,
-        }),
+        body: JSON.stringify(payload),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json().catch(() => ({}));
 
@@ -163,18 +169,22 @@ export default function EditQuoteScreen() {
         throw new Error(data?.error ?? "Failed to improve wording.");
       }
 
-      if (data?.improvedText) {
-        setDraft({ ...draft, customerSummary: String(data.improvedText).trim() });
+      const improvedText = String(data?.improvedText ?? "").trim();
+      if (improvedText) {
+        setDraft({ ...draft, customerSummary: improvedText });
+        return;
       }
+
+      setError(getAiWordingUnavailableMessage());
     } catch (e: any) {
       const rawMsg = String(e?.message ?? "");
-      const aiKeyProblem = rawMsg.toLowerCase().includes("api-key") || rawMsg.toLowerCase().includes("x-api-key");
+      const aiKeyProblem = rawMsg.toLowerCase().includes("api-key") || rawMsg.toLowerCase().includes("x-api-key") || rawMsg.toLowerCase().includes("aborted");
 
       if (aiKeyProblem) {
         await updateSettings({ aiAssistanceEnabled: false });
-        setError("AI is not configured yet, so it has been switched off. You can continue manually.");
+        setError(getAiWordingUnavailableMessage());
       } else {
-        setError(rawMsg || "Failed to improve wording.");
+        setError(rawMsg || getAiWordingUnavailableMessage());
       }
     } finally {
       setImprovingScope(false);
@@ -201,6 +211,7 @@ export default function EditQuoteScreen() {
         total: recalc.total,
         validDays: draft.validDays,
       });
+      await reloadQuotes();
       router.replace("/(tabs)/quotes" as any);
     } catch (e: any) {
       setError(e?.message || "Failed to save");
@@ -237,7 +248,7 @@ export default function EditQuoteScreen() {
             <View style={styles.aiHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.aiTitle}>AI Assistance</Text>
-                <Text style={styles.aiHint}>Improves wording only. It will not price jobs or change totals.</Text>
+                <Text style={styles.aiHint}>Improves wording only. It will not change prices, quantities, materials, guarantees, certification or timescales.</Text>
               </View>
               <Pressable style={[styles.aiToggle, { backgroundColor: settings.aiAssistanceEnabled ? "#FF6B35" : "#9CA3AF" }]} onPress={() => {
                 void (async () => {

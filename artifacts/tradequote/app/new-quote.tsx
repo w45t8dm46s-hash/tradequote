@@ -4,9 +4,8 @@ import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@clerk/expo";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Platform,
   ScrollView,
@@ -20,6 +19,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getApiBaseUrl } from "@/lib/api";
+import { buildSafeAiWordingPrompt, getAiWordingUnavailableMessage } from "@/lib/quoteWorkflow";
 
 import { useCustomers } from "@/context/CustomersContext";
 import { type Quote, useQuotes } from "@/context/QuotesContext";
@@ -31,7 +31,9 @@ import { TRADES, getTradeById } from "@/lib/trades";
 import BottomNav from "@/components/BottomNav";
 import UpgradePrompt from "@/components/UpgradePrompt";
 
-type Step = "type" | "details" | "generating" | "preview";
+const AI_TIMEOUT_MS = 10000;
+
+type Step = "type" | "details";
 
 function generateId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
 function generateQuoteNumber() {
@@ -47,7 +49,7 @@ interface PhotoAsset {
 export default function NewQuoteScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { addQuote } = useQuotes();
+  const { addQuote, reloadQuotes } = useQuotes();
   const { customers } = useCustomers();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
@@ -64,10 +66,8 @@ export default function NewQuoteScreen() {
   const [measurements, setMeasurements] = useState("");
   const [notes, setNotes] = useState("");
   const [photos, setPhotos] = useState<PhotoAsset[]>([]);
-  const [generatedQuote, setGeneratedQuote] = useState<Quote | null>(null);
   const [error, setError] = useState("");
   const [manualSaving, setManualSaving] = useState(false);
-  const [quoteSaving, setQuoteSaving] = useState(false);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [improvingDescription, setImprovingDescription] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState("");
@@ -112,110 +112,6 @@ export default function NewQuoteScreen() {
     return false;
   };
 
-  const generateQuote = async () => {
-    if (!(await ensurePro("AI quote generation"))) return;
-
-    if (!customerName.trim() || !description.trim()) {
-      setError("Please fill in customer name and job description.");
-      return;
-    }
-    setError("");
-    setStep("generating");
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    try {
-      const baseUrl = getApiBaseUrl();
-
-      const photoBase64 = photos
-        .filter((p) => p.base64)
-        .map((p) => p.base64 as string);
-
-      const token = await getToken();
-      const response = await fetch(`${baseUrl}/api/quotes/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          trade: currentTrade.id,
-          tradeLabel: currentTrade.label,
-          tradePromptContext: currentTrade.promptContext,
-          tradeTypicalItems: currentTrade.typicalItems,
-          jobType: selectedType?.label ?? jobType,
-          customerName,
-          customerAddress,
-          description,
-          measurements,
-          notes,
-          photos: photoBase64,
-          labourRate: settings.labourRate || undefined,
-          vatRate: settings.vatRegistered ? (settings.vatRate ?? 20) : 0,
-          vatRegistered: settings.vatRegistered,
-          validDays: settings.validDays || undefined,
-        }),
-      });
-
-      if (response.status === 402) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.replace("/upgrade");
-        return;
-      }
-      if (!response.ok) {
-        let serverMsg = `Server responded ${response.status}`;
-        try {
-          const errBody = await response.json();
-          if (errBody?.error) serverMsg = errBody.error;
-          if (errBody?.message) serverMsg = errBody.message;
-        } catch {}
-        throw new Error(serverMsg);
-      }
-      const data = await response.json();
-
-      const quote: Quote = {
-        id: generateId(),
-        jobType,
-        jobTypeLabel: selectedType?.label ?? jobType,
-        customerName,
-        customerAddress,
-        customerId: customerId || undefined,
-        description,
-        measurements,
-        notes,
-        photos: photos.map((p) => p.uri),
-        status: "draft",
-        createdAt: new Date().toISOString(),
-        lineItems: data.lineItems,
-        subtotal: data.subtotal,
-        taxRate: data.taxRate,
-        taxAmount: data.taxAmount,
-        total: data.total,
-        professionalSummary: data.professionalSummary,
-        customerSummary: data.customerSummary,
-        validDays: data.validDays ?? 30,
-        quoteNumber: generateQuoteNumber(),
-      };
-
-      setGeneratedQuote(quote);
-      setStep("preview");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e: any) {
-      console.error(e);
-      setStep("details");
-      const rawMsg = String(e?.message ?? "");
-      const aiKeyProblem = rawMsg.toLowerCase().includes("api-key") || rawMsg.toLowerCase().includes("x-api-key");
-
-      if (aiKeyProblem) {
-        await updateSettings({ aiAssistanceEnabled: false });
-        setError("AI is not configured yet, so it has been switched off. You can still create a manual quote.");
-      } else {
-        const msg = rawMsg ? `Failed to generate quote: ${rawMsg}` : "Failed to generate quote. Please check your connection and try again.";
-        setError(msg);
-      }
-    }
-  };
-
-
   const improveDescription = async () => {
     if (!(await ensurePro("AI improve wording"))) return;
 
@@ -231,17 +127,21 @@ export default function NewQuoteScreen() {
 
     try {
       const token = await getToken();
+      const payload = buildSafeAiWordingPrompt(description, `${currentTrade.label} quote. ${selectedType?.label ?? ""}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
       const response = await fetch(`${getApiBaseUrl()}/api/ai/improve-wording`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          text: description,
-          context: `${currentTrade.label} quote. ${selectedType?.label ?? ""}. Improve the customer-facing job description only. Do not add prices.`,
-        }),
+        body: JSON.stringify(payload),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json().catch(() => ({}));
 
@@ -250,18 +150,24 @@ export default function NewQuoteScreen() {
       }
 
       if (data?.improvedText) {
-        setDescription(String(data.improvedText).trim());
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        const improved = String(data.improvedText).trim();
+        if (improved) {
+          setDescription(improved);
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          return;
+        }
       }
+
+      setError(getAiWordingUnavailableMessage());
     } catch (e: any) {
       const rawMsg = String(e?.message ?? "");
-      const aiKeyProblem = rawMsg.toLowerCase().includes("api-key") || rawMsg.toLowerCase().includes("x-api-key");
+      const aiKeyProblem = rawMsg.toLowerCase().includes("api-key") || rawMsg.toLowerCase().includes("x-api-key") || rawMsg.toLowerCase().includes("aborted");
 
       if (aiKeyProblem) {
         await updateSettings({ aiAssistanceEnabled: false });
-        setError("AI is not configured yet, so it has been switched off. You can still create a manual quote.");
+        setError(getAiWordingUnavailableMessage());
       } else {
-        setError(rawMsg || "Failed to improve wording.");
+        setError(rawMsg || getAiWordingUnavailableMessage());
       }
     } finally {
       setImprovingDescription(false);
@@ -318,45 +224,12 @@ export default function NewQuoteScreen() {
       setManualSaving(true);
       setError("");
       await addQuote(quote);
+      await reloadQuotes();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      router.push(`/quote/edit/${quote.id}`);
+      router.replace({ pathname: "/quote/edit/[id]", params: { id: quote.id } } as any);
     } catch (e: any) {
       setError(e?.message ?? "Failed to create manual quote.");
       setManualSaving(false);
-    }
-  };
-
-  const saveQuote = async () => {
-    if (quoteSaving) return;
-    if (!generatedQuote) return;
-    try {
-      setQuoteSaving(true);
-      setError("");
-      await addQuote(generatedQuote);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-    } catch (e: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setError(e?.message ?? "Failed to save quote.");
-      setQuoteSaving(false);
-    }
-  };
-
-  const updateStatus = async (status: Quote["status"]) => {
-    if (quoteSaving) return;
-    if (!generatedQuote) return;
-    const updated = { ...generatedQuote, status };
-    setGeneratedQuote(updated);
-    try {
-      setQuoteSaving(true);
-      setError("");
-      await addQuote(updated);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.back();
-    } catch (e: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setError(e?.message ?? "Failed to save quote.");
-      setQuoteSaving(false);
     }
   };
 
@@ -565,105 +438,24 @@ export default function NewQuoteScreen() {
             </View>
             {photos.length > 0 && (
               <Text style={[styles.photoHint, { color: colors.primary }]}>
-                Claude Vision will analyse your photos to identify materials
+                Attach photos for reference; pricing is still added manually in the quote editor.
               </Text>
             )}
           </View>
 
-          {settings.aiAssistanceEnabled && (
-            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={generateQuote} activeOpacity={0.85}>
-              <Feather name="cpu" size={18} color="#fff" />
-              <Text style={[styles.primaryBtnText, { color: "#fff" }]}>Generate Quote with AI</Text>
-            </TouchableOpacity>
-          )}
-              <TouchableOpacity
-                style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
-                onPress={createManualQuote}
-                activeOpacity={0.85}
-               disabled={manualSaving}>
-                <Feather name="edit-3" size={18} color="#fff" />
-                <Text style={[styles.primaryBtnText, { color: "#fff" }]}>{manualSaving ? "Creating..." : "Create Manual Quote"}</Text>
-              </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
+            onPress={createManualQuote}
+            activeOpacity={0.85}
+            disabled={manualSaving}
+          >
+            <Feather name="edit-3" size={18} color="#fff" />
+            <Text style={[styles.primaryBtnText, { color: "#fff" }]}>{manualSaving ? "Creating..." : "Create Quote"}</Text>
+          </TouchableOpacity>
 
         </KeyboardAwareScrollView>
       )}
 
-      {step === "generating" && (
-        <View style={styles.generatingContainer}>
-          <View style={[styles.generatingCard, { backgroundColor: colors.card }]}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.generatingTitle, { color: colors.text }]}>Creating your quote...</Text>
-            <Text style={[styles.generatingText, { color: colors.mutedForeground }]}>
-              {photos.length > 0
-                ? "AI is analysing your photos and job details to build a precise quote"
-                : "AI is analysing your job details and building a professional quote"}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {step === "preview" && generatedQuote && (
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
-          {error ? (
-            <View style={[styles.errorBox, { backgroundColor: colors.destructive + "20", borderColor: colors.destructive }]}>
-              <Feather name="alert-circle" size={16} color={colors.destructive} />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
-          <View style={styles.previewHeader}>
-            <View style={[styles.previewBadge, { backgroundColor: colors.secondary }]}>
-              <Feather name="check-circle" size={14} color={colors.primary} />
-              <Text style={[styles.previewBadgeText, { color: colors.primary }]}>Quote Generated</Text>
-            </View>
-            <Text style={[styles.quoteNumber, { color: colors.mutedForeground }]}>{generatedQuote.quoteNumber}</Text>
-          </View>
-
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>PREPARED FOR</Text>
-            <Text style={[styles.sectionValue, { color: colors.text }]}>{generatedQuote.customerName}</Text>
-            {generatedQuote.customerAddress ? <Text style={[styles.sectionSub, { color: colors.mutedForeground }]}>{generatedQuote.customerAddress}</Text> : null}
-          </View>
-
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>SCOPE OF WORK</Text>
-            <Text style={[styles.summaryText, { color: colors.text }]}>{generatedQuote.customerSummary}</Text>
-          </View>
-
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>LINE ITEMS</Text>
-            {generatedQuote.lineItems.map((item, i) => (
-              <View key={i} style={[styles.lineItem, i < generatedQuote.lineItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-                <View style={styles.lineItemLeft}>
-                  <Text style={[styles.lineItemDesc, { color: colors.text }]}>{item.description}</Text>
-                  <Text style={[styles.lineItemMeta, { color: colors.mutedForeground }]}>{item.quantity} {item.unit} × £{item.rate.toFixed(2)}</Text>
-                </View>
-                <Text style={[styles.lineItemTotal, { color: colors.text }]}>£{item.total.toFixed(2)}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.totalRow}><Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>Subtotal</Text><Text style={[styles.totalValue, { color: colors.text }]}>£{generatedQuote.subtotal.toFixed(2)}</Text></View>
-            <View style={styles.totalRow}><Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>VAT ({generatedQuote.taxRate}%)</Text><Text style={[styles.totalValue, { color: colors.text }]}>£{generatedQuote.taxAmount.toFixed(2)}</Text></View>
-            <View style={[styles.totalRow, styles.grandTotalRow]}>
-              <Text style={[styles.grandTotalLabel, { color: colors.text }]}>Total</Text>
-              <Text style={[styles.grandTotalValue, { color: colors.primary }]}>£{generatedQuote.total.toFixed(2)}</Text>
-            </View>
-            <Text style={[styles.validText, { color: colors.mutedForeground }]}>Valid for {generatedQuote.validDays} days</Text>
-          </View>
-
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={[styles.outlineBtn, { borderColor: colors.border }]} onPress={saveQuote} activeOpacity={0.8}>
-              <Feather name="save" size={16} color={colors.text} />
-              <Text style={[styles.outlineBtnText, { color: colors.text }]}>Save Draft</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary, flex: 1 }]} onPress={() => updateStatus("sent")} activeOpacity={0.85}>
-              <Feather name="send" size={16} color="#fff" />
-              <Text style={[styles.primaryBtnText, { color: "#fff" }]}>Mark as Sent</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      )}
       <UpgradePrompt
         visible={!!upgradeFeature}
         featureName={upgradeFeature || "This feature"}
@@ -708,34 +500,6 @@ const styles = StyleSheet.create({
   primaryBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
   errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#EF4444", flex: 1 },
-  generatingContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
-  generatingCard: { width: "100%", padding: 40, borderRadius: 20, alignItems: "center", gap: 16 },
-  generatingTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center" },
-  generatingText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
-  previewHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: -4 },
-  previewBadge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  previewBadgeText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  quoteNumber: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  section: { padding: 16, borderRadius: 14, borderWidth: 1, gap: 8 },
-  sectionLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
-  sectionValue: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  sectionSub: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  summaryText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
-  lineItem: { paddingVertical: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  lineItemLeft: { flex: 1, marginRight: 12 },
-  lineItemDesc: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  lineItemMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  lineItemTotal: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  totalRow: { flexDirection: "row", justifyContent: "space-between" },
-  totalLabel: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  totalValue: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  grandTotalRow: { borderTopWidth: 1, paddingTop: 10, marginTop: 4 },
-  grandTotalLabel: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  grandTotalValue: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  validText: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
-  actionButtons: { flexDirection: "row", gap: 10 },
-  outlineBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, borderRadius: 14, gap: 8, borderWidth: 1, paddingHorizontal: 20 },
-  outlineBtnText: { fontSize: 15, fontFamily: "Inter_500Medium" },
   aiBox: { padding: 14, borderRadius: 14, borderWidth: 1, gap: 10 },
   aiHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   aiTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },

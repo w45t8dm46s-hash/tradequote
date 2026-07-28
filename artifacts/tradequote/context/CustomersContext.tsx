@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/expo";
 
 import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
@@ -35,6 +35,8 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const inFlightRef = useRef(false);
+  const loadedKeyRef = useRef<string | null>(null);
 
   const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const token = await getToken();
@@ -47,12 +49,18 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
   const loadCustomers = useCallback(async () => {
     if (!isLoaded) return;
 
+    const authKey = isSignedIn ? "signed-in" : "signed-out";
+    if (inFlightRef.current) return;
+    if (loadedKeyRef.current === authKey) return;
+
     if (!isSignedIn) {
+      loadedKeyRef.current = authKey;
       setCustomers([]);
       setLoading(false);
       return;
     }
 
+    inFlightRef.current = true;
     setLoading(true);
 
     try {
@@ -73,13 +81,15 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Failed to load customers", error);
     } finally {
+      loadedKeyRef.current = authKey;
+      inFlightRef.current = false;
       setLoading(false);
     }
   }, [getAuthHeaders, isLoaded, isSignedIn]);
 
   useEffect(() => {
     void loadCustomers();
-  }, [loadCustomers]);
+  }, [isLoaded, isSignedIn, loadCustomers]);
 
   const syncRecord = useCallback(async (record: Customer) => {
     if (!isSignedIn) throw new Error("You are not signed in.");
@@ -125,6 +135,11 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
   }, [getAuthHeaders, isSignedIn]);
 
   const getCustomer = useCallback((id: string) => customers.find((c) => c.id === id), [customers]);
+
+  const reloadCustomers = useCallback(async () => {
+    loadedKeyRef.current = null;
+    await loadCustomers();
+  }, [loadCustomers]);
 
   return (
     <CustomersContext.Provider value={{ customers, addCustomer, updateCustomer, deleteCustomer, getCustomer, loading, reloadCustomers: loadCustomers }}>
