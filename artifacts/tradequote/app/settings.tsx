@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -115,7 +115,7 @@ export default function SettingsScreen() {
             <Text style={styles.fieldLabel}>VAT registered</Text>
             <Text style={styles.hint}>If on, VAT is added to quotes at the rate below.</Text>
           </View>
-          <Switch value={local.vatRegistered} onValueChange={(v) => set("vatRegistered", v)} trackColor={{ false: "#E5E7EB", true: local.brandColor }} thumbColor="#fff" />
+            <Pressable onPress={() => set("vatRegistered", !local.vatRegistered)} style={{ backgroundColor: local.vatRegistered ? local.brandColor : "#E5E7EB", paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22 }}><Text style={{ color: local.vatRegistered ? "#fff" : "#111", fontWeight: "700" }}>{local.vatRegistered ? "Yes" : "No"}</Text></Pressable>
         </View>
         {local.vatRegistered && (
           <View style={styles.twoCol}>

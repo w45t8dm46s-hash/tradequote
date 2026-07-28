@@ -183,7 +183,7 @@ export default function NewQuoteScreen() {
     }
 
     const subtotal = 0;
-    const taxRate = 20;
+    const taxRate = settings.vatRegistered ? settings.vatRate : 0;
     const taxAmount = 0;
     const total = subtotal + taxAmount;
 

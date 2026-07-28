@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+// @ts-ignore -- Node test runner requires the explicit TypeScript extension.
 import { buildSafeAiWordingPrompt, getAiWordingUnavailableMessage } from "./quoteWorkflow.ts";
 
 test("buildSafeAiWordingPrompt blocks price and scope-changing edits", () => {
