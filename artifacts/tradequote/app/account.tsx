@@ -43,6 +43,7 @@ export default function AccountScreen() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const meRef = useRef<MeResponse | null>(null);
   const hasLoadedRef = useRef(false);
+  const initialLoadStartedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -86,9 +87,7 @@ export default function AccountScreen() {
     }
   }, [getToken]);
 
-  useEffect(() => {
-    void load(false);
-  }, [load]);
+  useEffect(() => { if (initialLoadStartedRef.current) return; initialLoadStartedRef.current = true; void load(false); }, [load]);
 
 
   const handleCancel = async () => {
