@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/expo";
 
 import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
@@ -59,6 +59,7 @@ function upsertQuote(list: Quote[], quote: Quote) {
 export function QuotesProvider({ children }: { children: React.ReactNode }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const didInitialLoadRef = useRef(false);
   const { getToken, isLoaded, isSignedIn } = useAuth();
 
   const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
@@ -103,8 +104,20 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
   }, [getAuthHeaders, isLoaded, isSignedIn]);
 
   useEffect(() => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn) {
+      const hadLoaded = didInitialLoadRef.current;
+      didInitialLoadRef.current = false;
+      if (hadLoaded) setQuotes([]);
+      setLoading(false);
+      return;
+    }
+
+    if (didInitialLoadRef.current) return;
+    didInitialLoadRef.current = true;
     void loadQuotes();
-  }, [loadQuotes]);
+  }, [isLoaded, isSignedIn, loadQuotes]);
 
   const syncRecord = useCallback(async (record: Quote) => {
     if (!isSignedIn) throw new Error("You are not signed in.");

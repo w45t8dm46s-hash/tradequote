@@ -57,7 +57,7 @@ const UNIT_OPTIONS = [
 export default function EditQuoteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getQuote, updateQuote, reloadQuotes, loading: quotesLoading } = useQuotes();
+  const { getQuote, updateQuote, loading: quotesLoading } = useQuotes();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
   const { isPro, reload: reloadPlan } = usePlan();
@@ -211,7 +211,6 @@ export default function EditQuoteScreen() {
         total: recalc.total,
         validDays: draft.validDays,
       });
-      await reloadQuotes();
       router.replace("/(tabs)/quotes" as any);
     } catch (e: any) {
       setError(e?.message || "Failed to save");

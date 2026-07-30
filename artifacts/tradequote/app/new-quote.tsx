@@ -49,7 +49,7 @@ interface PhotoAsset {
 export default function NewQuoteScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { addQuote, reloadQuotes } = useQuotes();
+  const { addQuote } = useQuotes();
   const { customers } = useCustomers();
   const { settings, updateSettings } = useSettings();
   const { getToken } = useAuth();
@@ -224,7 +224,6 @@ export default function NewQuoteScreen() {
       setManualSaving(true);
       setError("");
       await addQuote(quote);
-      await reloadQuotes();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       router.replace({ pathname: "/quote/edit/[id]", params: { id: quote.id } } as any);
     } catch (e: any) {

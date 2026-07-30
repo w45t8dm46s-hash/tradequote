@@ -69,10 +69,17 @@ export function usePlan() {
   }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
-    if (!isLoaded || didInitialLoadRef.current) return;
+    if (!isLoaded) return;
+
+    if (!isSignedIn) {
+      didInitialLoadRef.current = false;
+      return;
+    }
+
+    if (didInitialLoadRef.current) return;
     didInitialLoadRef.current = true;
     void reload();
-  }, [isLoaded, reload]);
+  }, [isLoaded, isSignedIn, reload]);
 
   return {
     loading,
