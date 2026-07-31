@@ -14,7 +14,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "uk.quoteforge.app",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {},
     "web": {
@@ -24,15 +29,29 @@
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://quoteforge.uk"
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow QuoteForge to access your photos so you can attach job images and upload your business logo.",
+          "cameraPermission": "Allow QuoteForge to use your camera so you can attach job photos.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "66a30af6-9fa6-4af0-83b8-a9b2a1377a0c"
+      }
+    },
+    "owner": "jimcasbecmon"
   }
 }
