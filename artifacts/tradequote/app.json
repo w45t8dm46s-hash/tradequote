@@ -41,6 +41,23 @@
           "cameraPermission": "Allow QuoteForge to use your camera so you can attach job photos.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPods": [
+              {
+                "name": "GoogleUtilities",
+                "modular_headers": true
+              },
+              {
+                "name": "RecaptchaInterop",
+                "modular_headers": true
+              }
+            ]
+          }
+        }
       ]
     ],
     "experiments": {
