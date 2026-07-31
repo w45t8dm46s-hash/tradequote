@@ -50,6 +50,7 @@ export default function AccountScreen() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     setError("");
@@ -162,6 +163,47 @@ export default function AccountScreen() {
       }
     } catch (e: any) {
       setError(e?.message || "Could not sign out. Please refresh and try again.");
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (busy) return;
+
+    setShowDeleteConfirm(false);
+    setBusy(true);
+    setError("");
+    setInfo("");
+
+    try {
+      const token = await getToken();
+      const resp = await fetchWithRetry(() =>
+        fetch(`${getApiBaseUrl()}/api/account`, {
+          method: "DELETE",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        })
+      );
+
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => null);
+        throw new Error(body?.error || "Could not delete account.");
+      }
+
+      try {
+        await clerk.signOut();
+      } catch {
+        // The Clerk user has already been deleted by the API.
+      }
+
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.location.href = "/sign-in";
+      } else {
+        router.replace("/(auth)/sign-in" as any);
+      }
+    } catch (e: any) {
+      setError(e?.message || "Could not delete account. Please try again.");
       setBusy(false);
     }
   };
@@ -298,6 +340,15 @@ export default function AccountScreen() {
                 )}
               </Pressable>
 
+              <Pressable
+                style={[styles.deleteAccountBtn, busy && styles.btnDisabled]}
+                onPress={() => setShowDeleteConfirm(true)}
+                disabled={busy}
+              >
+                <Feather name="trash-2" size={16} color="#EF4444" />
+                <Text style={styles.deleteAccountBtnText}>Delete account</Text>
+              </Pressable>
+
               <View style={styles.legalLinks}>
                 <Link href="/terms" style={styles.legalLink}>Terms</Link>
                 <Text style={styles.legalSeparator}>•</Text>
@@ -332,6 +383,41 @@ export default function AccountScreen() {
           </Pressable>
         </Modal>
       </ScrollView>
+      <Modal
+        visible={showDeleteConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setShowDeleteConfirm(false)}
+        >
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Delete account permanently?</Text>
+            <Text style={styles.modalBody}>
+              This permanently deletes your QuoteForge login, quotes, invoices,
+              customers and settings. Any active web subscription will be
+              cancelled immediately. This cannot be undone.
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnGhost]}
+                onPress={() => setShowDeleteConfirm(false)}
+              >
+                <Text style={styles.modalBtnGhostText}>Keep account</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnDanger]}
+                onPress={handleDeleteAccount}
+              >
+                <Text style={styles.modalBtnDangerText}>Delete permanently</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <BottomNav />
     </>
   );
@@ -368,6 +454,20 @@ const styles = StyleSheet.create({
   dangerBtnText: { color: "#EF4444", fontSize: 15, fontWeight: "600" },
   outlineBtn: { borderWidth: 1, borderColor: "#E5E7EB", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 12, backgroundColor: "#fff" },
   outlineBtnText: { color: "#111", fontSize: 15, fontWeight: "600" },
+  deleteAccountBtn: {
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FFF7F7",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  deleteAccountBtnText: { color: "#EF4444", fontWeight: "600" },
+
   legalLinks: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 8, marginTop: 18 },
   legalLink: { color: "#ff5a1f", fontWeight: "700", fontSize: 13 },
   legalSeparator: { color: "#999", fontSize: 13 },

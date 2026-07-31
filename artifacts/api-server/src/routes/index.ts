@@ -6,6 +6,7 @@ import stripeRouter from "./stripe";
 import authAdminRouter from "./auth-admin";
 import userRecordsRouter from "./userRecords";
 import aiRouter from "./ai";
+import accountRouter from "./account";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(stripeRouter);
 router.use(authAdminRouter);
 router.use(userRecordsRouter);
 router.use(aiRouter);
+router.use(accountRouter);
 
 export default router;
