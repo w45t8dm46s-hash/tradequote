@@ -23,11 +23,12 @@ export default function TabLayout() {
     if (settingsLoading || settings.trade || hasShownInitialTradePicker.current) return;
 
     const shouldShow =
+      Platform.OS === "web" &&
       typeof window !== "undefined" &&
-      window.localStorage.getItem("qf_show_trade_picker_once") === "1";
+      window.localStorage?.getItem("qf_show_trade_picker_once") === "1";
 
     if (shouldShow) {
-      window.localStorage.removeItem("qf_show_trade_picker_once");
+      window.localStorage?.removeItem("qf_show_trade_picker_once");
       hasShownInitialTradePicker.current = true;
       setShowTradePicker(true);
     }
