@@ -5,7 +5,7 @@ export default function PrivacyScreen() {
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
       <Text style={styles.title}>QuoteForge Privacy Policy</Text>
-      <Text style={styles.updated}>Last updated: July 2026</Text>
+      <Text style={styles.updated}>Last updated: August 2026</Text>
 
       <Section title="1. Who we are">
         QuoteForge provides quoting and business administration software for tradespeople and small trade businesses.
@@ -40,12 +40,8 @@ export default function PrivacyScreen() {
       </Section>
 
       <Section title="9. Contact">
-        For privacy questions or data requests, contact QuoteForge using the support contact details shown in the app or on the website.
+        For privacy questions or data requests, contact QuoteForge at quoteforgetest@outlook.com.
       </Section>
-
-      <Text style={styles.note}>
-        This privacy policy is a practical launch version and should be reviewed against your actual suppliers, data flows and business details before wider public launch.
-      </Text>
     </ScrollView>
   );
 }

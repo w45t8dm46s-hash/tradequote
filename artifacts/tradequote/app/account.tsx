@@ -354,6 +354,8 @@ export default function AccountScreen() {
                 <Text style={styles.legalSeparator}>•</Text>
                 <Link href="/privacy" style={styles.legalLink}>Privacy</Link>
                 <Text style={styles.legalSeparator}>•</Text>
+                <Link href={"/support" as any} style={styles.legalLink}>Support</Link>
+                <Text style={styles.legalSeparator}>•</Text>
                 <Link href="/referral-terms" style={styles.legalLink}>Referral Partner Terms</Link>
               </View>
             </View>
