@@ -1,4 +1,6 @@
-import { Platform, Share } from "react-native";
+import { Platform } from "react-native";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import type { Invoice } from "@/context/InvoicesContext";
 import type { BusinessSettings } from "@/context/SettingsContext";
 
@@ -211,6 +213,21 @@ export async function printInvoice(invoice: Invoice, settings: BusinessSettings)
     return;
   }
 
-  const text = `INVOICE ${invoice.invoiceNumber}\n\nBilled to: ${invoice.customerName}\n\nTotal: £${fmt(invoice.total)}\nPaid: £${fmt(invoice.paidAmount)}\nOutstanding: £${fmt(Math.max(0, invoice.total - invoice.paidAmount))}`;
-  await Share.share({ message: text, title: `Invoice ${invoice.invoiceNumber}` });
+  const nativeHtml = html.replace(/<script>[\s\S]*?<\/script>/g, "");
+  const { uri } = await Print.printToFileAsync({
+    html: nativeHtml,
+    width: 595,
+    height: 842,
+  });
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, {
+      UTI: "com.adobe.pdf",
+      mimeType: "application/pdf",
+      dialogTitle: `Share Invoice ${invoice.invoiceNumber}`,
+    });
+    return;
+  }
+
+  await Print.printAsync({ uri });
 }

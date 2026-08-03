@@ -38,7 +38,7 @@ export default function ScheduleScreen() {
   });
   const [selectedDate, setSelectedDate] = useState<string>(toDateKey(new Date()));
   const isWeb = Platform.OS === "web";
-  const topPadding = isWeb ? 67 : insets.top;
+  const topPadding = isWeb ? 67 : 0;
 
   const sorted = useMemo(() => {
     const filtered = filter === "all" ? jobs : jobs.filter((j) => j.status === filter);

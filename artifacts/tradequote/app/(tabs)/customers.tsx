@@ -16,7 +16,7 @@ export default function CustomersScreen() {
   const { quotes } = useQuotes();
   const [search, setSearch] = useState("");
   const isWeb = Platform.OS === "web";
-  const topPadding = isWeb ? 67 : insets.top;
+  const topPadding = isWeb ? 67 : 0;
 
   const quoteCountByCustomer = useMemo(() => {
     const map: Record<string, number> = {};

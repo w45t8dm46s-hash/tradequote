@@ -31,7 +31,7 @@ export default function QuotesScreen() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<QuoteStatus | "all">("all");
   const isWeb = Platform.OS === "web";
-  const topPadding = isWeb ? 67 : insets.top;
+  const topPadding = isWeb ? 67 : 0;
 
   const filtered = useMemo(() => {
     return quotes.filter((q) => {

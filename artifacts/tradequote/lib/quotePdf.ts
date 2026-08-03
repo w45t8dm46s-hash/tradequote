@@ -1,4 +1,6 @@
-import { Platform, Share } from "react-native";
+import { Platform } from "react-native";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import type { Quote } from "@/context/QuotesContext";
 import type { BusinessSettings } from "@/context/SettingsContext";
 
@@ -222,7 +224,21 @@ export async function printQuote(quote: Quote, settings: BusinessSettings): Prom
     win.document.close();
     return;
   }
-  // Native fallback: share as text. (Adding expo-print would yield true PDF on native.)
-  const text = `QUOTE ${quote.quoteNumber}\n\nPrepared for: ${quote.customerName}\n\n${quote.customerSummary}\n\nTotal: £${fmt(quote.total)}\n\nValid for ${quote.validDays} days.`;
-  await Share.share({ message: text, title: `Quote ${quote.quoteNumber}` });
+  const nativeHtml = html.replace(/<script>[\s\S]*?<\/script>/g, "");
+  const { uri } = await Print.printToFileAsync({
+    html: nativeHtml,
+    width: 595,
+    height: 842,
+  });
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, {
+      UTI: "com.adobe.pdf",
+      mimeType: "application/pdf",
+      dialogTitle: `Share Quote ${quote.quoteNumber}`,
+    });
+    return;
+  }
+
+  await Print.printAsync({ uri });
 }

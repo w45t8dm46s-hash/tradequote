@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const { user } = useUser();
 
   const isWeb = Platform.OS === "web";
-  const topPadding = isWeb ? 67 : insets.top;
+  const topPadding = isWeb ? 67 : 0;
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

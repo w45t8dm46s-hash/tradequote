@@ -88,7 +88,16 @@ export default function QuoteDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            paddingTop: 16,
+            paddingBottom: bottomPad,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Feather name="arrow-left" size={20} color={colors.text} />

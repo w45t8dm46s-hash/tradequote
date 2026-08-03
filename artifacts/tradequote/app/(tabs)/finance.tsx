@@ -24,7 +24,7 @@ export default function FinanceScreen() {
   const { expenses, deleteExpense } = useExpenses();
   const [tab, setTab] = useState<Tab>("invoices");
   const isWeb = Platform.OS === "web";
-  const topPadding = isWeb ? 67 : insets.top;
+  const topPadding = isWeb ? 67 : 0;
 
   const stats = useMemo(() => {
     const totalInvoiced = invoices.reduce((s, i) => s + i.total, 0);
