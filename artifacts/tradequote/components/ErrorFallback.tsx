@@ -74,7 +74,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         </Text>
 
         <Text style={[styles.message, { color: colors.mutedForeground }]}>
-          {error.message || "Please reload the app to continue."}
+          Please reload the app to continue.
         </Text>
 
         <Pressable

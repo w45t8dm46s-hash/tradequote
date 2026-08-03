@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 type UpgradePromptProps = {
   visible: boolean;
@@ -16,6 +16,8 @@ export default function UpgradePrompt({
   description,
   onClose,
 }: UpgradePromptProps) {
+  const isIOS = Platform.OS === "ios";
+
   const goUpgrade = () => {
     onClose();
     router.push("/upgrade");
@@ -29,22 +31,26 @@ export default function UpgradePrompt({
             <Feather name="zap" size={24} color="#FF6B35" />
           </View>
 
-          <Text style={styles.title}>Upgrade required</Text>
+          <Text style={styles.title}>{isIOS ? "Feature unavailable" : "Upgrade required"}</Text>
           <Text style={styles.body}>
             {featureName} is not included in your current plan.
           </Text>
           <Text style={styles.subBody}>
-            {description || "Upgrade to unlock AI wording, professional PDF documents and advanced quote tools."}
+            {isIOS
+              ? "This feature is unavailable for this account."
+              : description || "Upgrade to unlock AI wording, professional PDF documents and advanced quote tools."}
           </Text>
 
           <View style={styles.actions}>
             <Pressable style={styles.secondaryBtn} onPress={onClose}>
-              <Text style={styles.secondaryText}>Not now</Text>
+              <Text style={styles.secondaryText}>{isIOS ? "Close" : "Not now"}</Text>
             </Pressable>
 
-            <Pressable style={styles.primaryBtn} onPress={goUpgrade}>
-              <Text style={styles.primaryText}>Upgrade</Text>
-            </Pressable>
+            {!isIOS && (
+              <Pressable style={styles.primaryBtn} onPress={goUpgrade}>
+                <Text style={styles.primaryText}>Upgrade</Text>
+              </Pressable>
+            )}
           </View>
         </Pressable>
       </Pressable>

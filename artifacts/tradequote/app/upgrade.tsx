@@ -24,6 +24,11 @@ export default function UpgradeScreen() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (Platform.OS === "ios") {
+      setLoadingPrice(false);
+      return;
+    }
+
     (async () => {
       try {
         const baseUrl = getBaseUrl();
@@ -44,7 +49,7 @@ export default function UpgradeScreen() {
   }, []);
 
   const startCheckout = async () => {
-    if (!price) return;
+    if (Platform.OS === "ios" || !price) return;
     setCheckingOut(true);
     setError("");
     try {
@@ -80,6 +85,29 @@ export default function UpgradeScreen() {
   const priceLabel = price
     ? `£${(price.unit_amount / 100).toFixed(2)}/${price.recurring?.interval || "month"}`
     : "£14.99/month";
+
+  if (Platform.OS === "ios") {
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: "#FAFAFA" }} contentContainerStyle={styles.container}>
+        <Pressable onPress={() => router.back()} style={styles.closeBtn}>
+          <Feather name="x" size={24} color="#333" />
+        </Pressable>
+
+        <View style={styles.iconBubble}>
+          <Feather name="user" size={32} color="#FF6B35" />
+        </View>
+
+        <Text style={styles.title}>Plan management</Text>
+        <Text style={styles.subtitle}>
+          Your existing QuoteForge account access can be used in this app.
+        </Text>
+
+        <Pressable style={styles.button} onPress={() => router.back()}>
+          <Text style={styles.buttonText}>Back</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#FAFAFA" }} contentContainerStyle={styles.container}>

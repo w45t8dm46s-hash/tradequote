@@ -280,7 +280,7 @@ export default function AccountScreen() {
 
               {info ? <Text style={styles.info}>{info}</Text> : null}
 
-              {me ? (
+              {Platform.OS !== "ios" && me ? (
                 <View style={{ gap: 10, marginTop: 14 }}>
                   {!me.isPro && (
                     <Pressable style={styles.primaryBtn} onPress={() => router.push("/upgrade")}>
