@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { Modal, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type QuoteStatus, useQuotes } from "@/context/QuotesContext";
@@ -57,12 +57,8 @@ export default function QuoteDetailScreen() {
     void printQuote(quote, settings);
   };
 
-  const handleShare = async () => {
-    const lineItemsText = quote.lineItems
-      .map((item) => `• ${item.description}: ${item.quantity} ${item.unit} × £${item.rate.toFixed(2)} = £${item.total.toFixed(2)}`)
-      .join("\n");
-    const text = `QUOTE ${quote.quoteNumber}\n\nPrepared for: ${quote.customerName}\n${quote.customerAddress ? `Address: ${quote.customerAddress}\n` : ""}\n${quote.customerSummary}\n\nLINE ITEMS:\n${lineItemsText}\n\nSubtotal: £${quote.subtotal.toFixed(2)}\nVAT (${quote.taxRate}%): £${quote.taxAmount.toFixed(2)}\nTOTAL: £${quote.total.toFixed(2)}\n\nValid for ${quote.validDays} days.`;
-    await Share.share({ message: text, title: `Quote for ${quote.customerName}` });
+  const handleShare = () => {
+    handleDownloadPdf();
   };
 
   const handleDelete = () => setShowDeleteConfirm(true);

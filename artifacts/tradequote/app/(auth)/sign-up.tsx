@@ -37,11 +37,8 @@ export default function SignUpScreen() {
       setError(clerkMsg(finalErr, "Account created but sign-in failed. Please sign in."));
       return false;
     }
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("qf_show_trade_picker_once", "1");
-    }
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("qf_show_trade_picker_once", "1");
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.localStorage?.setItem("qf_show_trade_picker_once", "1");
     }
     router.replace("/(tabs)" as Href);
     return true;

@@ -18,6 +18,39 @@ function toNum(s: string): number {
 }
 
 
+
+function DecimalInput({ value, onValueChange, style }: {
+  value?: number;
+  onValueChange: (value: number) => void;
+  style?: any;
+}) {
+  const [text, setText] = useState(String(value ?? ""));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setText(String(value ?? ""));
+  }, [editing, value]);
+
+  const handleChange = (next: string) => {
+    const cleaned = next.replace(/,/g, ".").replace(/[^\d.]/g, "");
+    if ((cleaned.match(/\./g) ?? []).length > 1) return;
+    setText(cleaned);
+
+    if (cleaned === "" || cleaned === ".") {
+      onValueChange(0);
+      return;
+    }
+
+    const parsed = Number(cleaned);
+    if (Number.isFinite(parsed)) onValueChange(Math.max(0, parsed));
+  };
+
+  return <TextInput style={[styles.input, style]} value={text}
+    onChangeText={handleChange} onFocus={() => setEditing(true)}
+    onBlur={() => setEditing(false)} keyboardType="decimal-pad" />;
+}
+
+
 const GENERIC_SCOPE_TEXT = "Thank you for your enquiry. Please review the quote details below.";
 const AI_TIMEOUT_MS = 10000;
 
@@ -297,7 +330,7 @@ export default function EditQuoteScreen() {
             <View style={styles.itemRow}>
               <View style={{ flex: 1.1 }}>
                 <Text style={styles.smallLabel}>Qty</Text>
-                <TextInput style={styles.input} value={String(item.quantity ?? "")} onChangeText={(v) => updateItem(idx, { quantity: toNum(v) })} keyboardType="decimal-pad" />
+                <DecimalInput value={item.quantity} onValueChange={(value) => updateItem(idx, { quantity: value })} />
               </View>
               <View style={{ flex: 1.2 }}>
                 <Text style={styles.smallLabel}>Unit</Text>
@@ -331,7 +364,7 @@ export default function EditQuoteScreen() {
               </View>
               <View style={{ flex: 1.3 }}>
                 <Text style={styles.smallLabel}>Rate (£)</Text>
-                <TextInput style={styles.input} value={String(item.rate ?? "")} onChangeText={(v) => updateItem(idx, { rate: toNum(v) })} keyboardType="decimal-pad" />
+                <DecimalInput value={item.rate} onValueChange={(value) => updateItem(idx, { rate: value })} />
               </View>
               <View style={{ flex: 1.2 }}>
                 <Text style={styles.smallLabel}>Total</Text>
@@ -356,7 +389,7 @@ export default function EditQuoteScreen() {
         </View>
         <View style={[styles.totalRow, { alignItems: "center" }]}>
           <Text style={styles.totalLabel}>VAT rate (%)</Text>
-          <TextInput style={[styles.input, { width: 80, textAlign: "right" }]} value={String(draft.taxRate ?? 0)} onChangeText={(v) => setDraft({ ...draft, taxRate: toNum(v) })} keyboardType="decimal-pad" />
+          <DecimalInput style={{ width: 80, textAlign: "right" }} value={draft.taxRate} onValueChange={(value) => setDraft({ ...draft, taxRate: value })} />
         </View>
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>VAT</Text>
@@ -405,7 +438,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: "700", color: "#111" },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   smallLabel: { fontSize: 11, color: "#6B7280", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
-  input: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 10 : 8, fontSize: 14, color: "#111", backgroundColor: "#fff" },
+  input: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 10 : 8, fontSize: Platform.OS === "web" ? 16 : 14, color: "#111", backgroundColor: "#fff" },
   multi: { minHeight: 56, textAlignVertical: "top" },
   unitPicker: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 38 },
   unitPickerText: { color: "#111", fontSize: 14 },

@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 10 },
   fieldGroup: { gap: 6 },
   label: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular" },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: Platform.OS === "web" ? 16 : 15, fontFamily: "Inter_400Regular" },
   textArea: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular", minHeight: 80 },
   picker: { flexDirection: "row", alignItems: "center" },
   dropdown: { borderWidth: 1, borderRadius: 12, overflow: "hidden", marginTop: -8 },

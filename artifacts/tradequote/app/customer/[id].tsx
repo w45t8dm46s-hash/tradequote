@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   notesBox: { padding: 14, borderRadius: 14, borderWidth: 1, gap: 6 },
   notesText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
   editCard: { padding: 14, borderRadius: 14, borderWidth: 1, gap: 10 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular" },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: Platform.OS === "web" ? 16 : 14, fontFamily: "Inter_400Regular" },
   textArea: { minHeight: 80, textAlignVertical: "top" },
   editActions: { flexDirection: "row", gap: 10 },
   cancelBtn: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center" },

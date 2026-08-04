@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   dropItem: { paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1 },
   dropText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   dropSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular" },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: Platform.OS === "web" ? 16 : 15, fontFamily: "Inter_400Regular" },
   textArea: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular", minHeight: 90 },
   photoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   photoThumb: { width: 80, height: 80, borderRadius: 10, overflow: "hidden" },

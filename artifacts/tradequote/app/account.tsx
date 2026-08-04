@@ -150,8 +150,8 @@ export default function AccountScreen() {
     setError("");
 
     try {
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem("qf_show_trade_picker_once");
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.localStorage?.removeItem("qf_show_trade_picker_once");
       }
 
       await clerk.signOut();

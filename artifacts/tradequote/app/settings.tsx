@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontWeight: "700", color: "#111", marginBottom: 2 },
   fieldLabel: { fontSize: 12, fontWeight: "600", color: "#374151" },
   hint: { fontSize: 11, color: "#6B7280", marginTop: 2 },
-  input: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 12 : 10, fontSize: 14, color: "#111", backgroundColor: "#fff" },
+  input: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 12 : 10, fontSize: Platform.OS === "web" ? 16 : 14, color: "#111", backgroundColor: "#fff" },
   inputMulti: { minHeight: 64, textAlignVertical: "top" },
   twoCol: { flexDirection: "row", gap: 12 },
   switchRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 4 },

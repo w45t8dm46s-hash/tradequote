@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   addLink: { fontSize: 14, fontFamily: "Inter_500Medium" },
   label: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular" },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: Platform.OS === "web" ? 16 : 15, fontFamily: "Inter_400Regular" },
   textArea: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular", minHeight: 80 },
   lineItemBox: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8, marginBottom: 8 },
   lineItemTop: { flexDirection: "row", alignItems: "center", gap: 8 },
