@@ -4,6 +4,7 @@ import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 import { getUncachableStripeClient } from "./stripeClient";
+import { getRevenueCatAccess } from "./revenueCat";
 
 export interface AuthedRequest extends Request {
   userId: string;
@@ -105,6 +106,42 @@ export async function hasEverSubscribed(stripeCustomerId: string | null): Promis
   return subscriptions.data.some((subscription: any) =>
     subscriptionMatchesConfiguredPrice(subscription, configuredPriceIds)
   );
+}
+
+export async function hasProAccess(
+  userId: string,
+  stripeCustomerId: string | null,
+): Promise<boolean> {
+  try {
+    if (await hasActiveSubscription(stripeCustomerId)) return true;
+  } catch (error) {
+    console.error("Stripe Pro access check failed:", error);
+  }
+
+  try {
+    return (await getRevenueCatAccess(userId)).active;
+  } catch (error) {
+    console.error("RevenueCat Pro access check failed:", error);
+    return false;
+  }
+}
+
+export async function hasEverHadProAccess(
+  userId: string,
+  stripeCustomerId: string | null,
+): Promise<boolean> {
+  try {
+    if (await hasEverSubscribed(stripeCustomerId)) return true;
+  } catch (error) {
+    console.error("Stripe subscription history check failed:", error);
+  }
+
+  try {
+    return (await getRevenueCatAccess(userId)).ever;
+  } catch (error) {
+    console.error("RevenueCat subscription history check failed:", error);
+    return false;
+  }
 }
 
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {

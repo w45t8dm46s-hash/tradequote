@@ -2,7 +2,7 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq, sql, and } from "drizzle-orm";
-import { requireAuth, hasActiveSubscription, hasEverSubscribed, FREE_QUOTE_LIMIT, type AuthedRequest } from "../lib/requireAuth";
+import { requireAuth, hasProAccess, hasEverHadProAccess, FREE_QUOTE_LIMIT, type AuthedRequest } from "../lib/requireAuth";
 
 const router = Router();
 
@@ -11,7 +11,7 @@ router.post("/quotes/generate", requireAuth, async (req, res) => {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) return res.status(404).json({ error: "User not found" });
 
-  const isPro = await hasActiveSubscription(user.stripeCustomerId);
+  const isPro = await hasProAccess(userId, user.stripeCustomerId);
 
   // Atomic reservation: increment the count only if either Pro or under the
   // free limit. This prevents race conditions at the boundary.
@@ -27,7 +27,7 @@ router.post("/quotes/generate", requireAuth, async (req, res) => {
     // Block ex-subscribers from falling back to the free allowance.
     // If they have ever had a Pro subscription (even a cancelled/expired one),
     // they must re-subscribe — there is no free-tier loophole.
-    const wasEverPro = await hasEverSubscribed(user.stripeCustomerId);
+    const wasEverPro = await hasEverHadProAccess(userId, user.stripeCustomerId);
     if (wasEverPro) {
       return res.status(402).json({
         error: "upgrade_required",

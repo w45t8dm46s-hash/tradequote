@@ -16,6 +16,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RevenueCatIdentity } from "@/components/RevenueCatIdentity";
 import { CustomersProvider } from "@/context/CustomersContext";
 import { ExpensesProvider } from "@/context/ExpensesContext";
 import { InvoicesProvider } from "@/context/InvoicesContext";
@@ -84,6 +85,7 @@ export default function RootLayout() {
       proxyUrl={proxyUrl}
     >
       <ClerkLoaded>
+        <RevenueCatIdentity>
         <SafeAreaProvider>
           <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
             <ErrorBoundary>
@@ -109,6 +111,7 @@ export default function RootLayout() {
             </ErrorBoundary>
           </SafeAreaView>
         </SafeAreaProvider>
+        </RevenueCatIdentity>
       </ClerkLoaded>
     </ClerkProvider>
   );

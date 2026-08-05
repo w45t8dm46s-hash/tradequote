@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { requireAuth, FREE_QUOTE_LIMIT, type AuthedRequest } from "../lib/requireAuth";
 import { getUncachableStripeClient } from "../lib/stripeClient";
+import { getRevenueCatAccess } from "../lib/revenueCat";
 
 const router = Router();
 
@@ -65,7 +66,20 @@ router.get("/me", requireAuth, async (req, res) => {
     console.error("Load subscription error:", err);
   }
 
-  const isPro = Boolean(subscription);
+  let appleAccess = {
+    active: false,
+    ever: false,
+    productIdentifier: null as string | null,
+    expiresAt: null as string | null,
+  };
+
+  try {
+    appleAccess = await getRevenueCatAccess(user.id, req.query.refreshApple === "1");
+  } catch (err) {
+    console.error("Load Apple subscription error:", err);
+  }
+
+  const isPro = Boolean(subscription) || appleAccess.active;
 
   res.json({
     id: user.id,
@@ -75,6 +89,13 @@ router.get("/me", requireAuth, async (req, res) => {
     isPro,
     quotesRemaining: isPro ? null : Math.max(0, FREE_QUOTE_LIMIT - user.quoteCount),
     subscription,
+    subscriptionSource: subscription ? "stripe" : appleAccess.active ? "apple" : null,
+    appleSubscription: appleAccess.active
+      ? {
+          productIdentifier: appleAccess.productIdentifier,
+          expiresAt: appleAccess.expiresAt,
+        }
+      : null,
   });
 });
 

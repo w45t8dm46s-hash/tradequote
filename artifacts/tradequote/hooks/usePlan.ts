@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/expo";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
+import { subscribeToPlanChanges } from "@/lib/revenueCatClient";
 
 type MeResponse = {
   isPro?: boolean;
@@ -80,6 +81,12 @@ export function usePlan() {
     didInitialLoadRef.current = true;
     void reload();
   }, [isLoaded, isSignedIn, reload]);
+
+  useEffect(() => {
+    return subscribeToPlanChanges(() => {
+      void reload();
+    });
+  }, [reload]);
 
   return {
     loading,

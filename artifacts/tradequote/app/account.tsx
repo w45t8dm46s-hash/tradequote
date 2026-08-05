@@ -1,10 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
 import { useRouter, Link } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import Purchases from "react-native-purchases";
 
 import { fetchWithRetry, getApiBaseUrl, parseJsonResponse } from "@/lib/api";
+import {
+  ensureRevenueCatUser,
+  notifyPlanChanged,
+  subscribeToPlanChanges,
+} from "@/lib/revenueCatClient";
 import BottomNav from "@/components/BottomNav";
 
 type MeResponse = {
@@ -14,6 +20,11 @@ type MeResponse = {
   quoteLimit: number;
   isPro: boolean;
   quotesRemaining: number | null;
+  subscriptionSource?: "stripe" | "apple" | null;
+  appleSubscription?: {
+    productIdentifier: string | null;
+    expiresAt: string | null;
+  } | null;
   subscription: {
     status: string;
     cancelAtPeriodEnd: boolean;
@@ -35,9 +46,28 @@ function formatPrice(amount: number | null, currency: string | null, interval: s
   return `${symbol}${(amount / 100).toFixed(2)}/${interval ?? "month"}`;
 }
 
+function formatAppleDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatApplePlan(productIdentifier: string | null | undefined): string {
+  if (productIdentifier === "uk.quoteforge.app.pro.annual") {
+    return "QuoteForge Pro Annual";
+  }
+  if (productIdentifier === "uk.quoteforge.app.pro.monthly") {
+    return "QuoteForge Pro Monthly";
+  }
+  return "QuoteForge Pro";
+}
+
 export default function AccountScreen() {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const { user } = useUser();
   const clerk = useClerk();
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -90,6 +120,11 @@ export default function AccountScreen() {
 
   useEffect(() => { if (initialLoadStartedRef.current) return; initialLoadStartedRef.current = true; void load(false); }, [load]);
 
+  useEffect(() => {
+    return subscribeToPlanChanges(() => {
+      void load(true);
+    });
+  }, [load]);
 
   const handleCancel = async () => {
     setShowConfirm(false);
@@ -133,6 +168,54 @@ export default function AccountScreen() {
       setError(e?.message || "Resume failed");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleRestoreApplePurchases = async () => {
+    if (!userId || busy) return;
+
+    setBusy(true);
+    setError("");
+    setInfo("");
+
+    try {
+      await ensureRevenueCatUser(userId);
+      const customerInfo = await Purchases.restorePurchases();
+
+      if (!customerInfo.entitlements.active.pro) {
+        setError("No active QuoteForge Pro subscription was found for this Apple ID.");
+        return;
+      }
+
+      const token = await getToken();
+      const response = await fetch(
+        `${getApiBaseUrl()}/api/me?refreshApple=1&t=${Date.now()}`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "Cache-Control": "no-cache",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Your purchase was restored, but QuoteForge could not refresh your plan.");
+      }
+
+      notifyPlanChanged();
+      setInfo("Your Apple subscription has been restored.");
+    } catch (e: any) {
+      setError(e?.message || "Purchases could not be restored.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleManageAppleSubscription = async () => {
+    try {
+      await Linking.openURL("https://apps.apple.com/account/subscriptions");
+    } catch {
+      setError("Apple subscription management could not be opened.");
     }
   };
 
@@ -270,6 +353,28 @@ export default function AccountScreen() {
                     </View>
                   )}
                 </View>
+              ) : me?.isPro ? (
+                <View style={{ gap: 8, marginTop: 4 }}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Plan</Text>
+                    <Text style={styles.detailValue}>
+                      {formatApplePlan(me.appleSubscription?.productIdentifier)}
+                    </Text>
+                  </View>
+                  {me.subscriptionSource === "apple" && me.appleSubscription?.expiresAt ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Current period ends</Text>
+                      <Text style={styles.detailValue}>
+                        {formatAppleDate(me.appleSubscription.expiresAt)}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Text style={styles.smallMuted}>
+                    {me.subscriptionSource === "apple"
+                      ? "Billed through your Apple ID."
+                      : "Your existing QuoteForge Pro access is active."}
+                  </Text>
+                </View>
               ) : me ? (
                 <View style={{ marginTop: 4 }}>
                   <Text style={styles.smallMuted}>
@@ -279,6 +384,45 @@ export default function AccountScreen() {
               ) : null}
 
               {info ? <Text style={styles.info}>{info}</Text> : null}
+
+              {Platform.OS === "ios" && me ? (
+                <View style={{ gap: 10, marginTop: 14 }}>
+                  {!me.isPro ? (
+                    <Pressable
+                      style={styles.primaryBtn}
+                      onPress={() => router.push("/upgrade")}
+                    >
+                      <Feather name="zap" size={16} color="#fff" />
+                      <Text style={styles.primaryBtnText}>View Pro plans</Text>
+                    </Pressable>
+                  ) : null}
+
+                  {me.subscriptionSource === "apple" ? (
+                    <Pressable
+                      style={styles.outlineBtn}
+                      onPress={handleManageAppleSubscription}
+                    >
+                      <Feather name="credit-card" size={16} color="#111" />
+                      <Text style={styles.outlineBtnText}>Manage Apple subscription</Text>
+                    </Pressable>
+                  ) : null}
+
+                  <Pressable
+                    style={[styles.outlineBtn, busy && styles.btnDisabled]}
+                    onPress={handleRestoreApplePurchases}
+                    disabled={busy}
+                  >
+                    {busy ? (
+                      <ActivityIndicator color="#111" />
+                    ) : (
+                      <>
+                        <Feather name="refresh-cw" size={16} color="#111" />
+                        <Text style={styles.outlineBtnText}>Restore purchases</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              ) : null}
 
               {Platform.OS !== "ios" && me ? (
                 <View style={{ gap: 10, marginTop: 14 }}>
@@ -360,9 +504,15 @@ export default function AccountScreen() {
               </View>
             </View>
 
-            <Text style={styles.footnote}>
-              Cancelling stops future renewals. You'll keep Pro access until the end of the current billing period and can resume any time before then.
-            </Text>
+            {Platform.OS === "ios" ? (
+              <Text style={styles.footnote}>
+                Apple subscriptions can be changed or cancelled through your Apple ID subscription settings.
+              </Text>
+            ) : sub ? (
+              <Text style={styles.footnote}>
+                Cancelling stops future renewals. You'll keep Pro access until the end of the current billing period and can resume any time before then.
+              </Text>
+            ) : null}
           </>
         )}
 
